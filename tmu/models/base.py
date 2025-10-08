@@ -283,6 +283,27 @@ class TMBaseModel:
             seed=self.seed,
         )
         return clause_bank_type, clause_bank_args
+    
+    def _build_pl_bank(self, X: np.ndarray):
+        from tmu.clause_bank.clause_bank_pl import ClauseBankPL
+        clause_bank_type = ClauseBankPL
+        clause_bank_args = dict(
+            X_shape=X.shape,
+            d=self.d,
+            s=self.s,
+            boost_true_positive_feedback=self.boost_true_positive_feedback,
+            reuse_random_feedback=self.reuse_random_feedback,
+            max_included_literals=self.max_included_literals,
+            number_of_clauses=self.number_of_clauses,
+            number_of_state_bits_ta=self.number_of_state_bits_ta,
+            number_of_state_bits_ind=self.number_of_state_bits_ind,
+            patch_dim=self.patch_dim,
+            batch_size=self.batch_size,
+            incremental=self.incremental,
+            type_ia_ii_feedback_ratio=self.type_ia_ii_feedback_ratio,
+            seed=self.seed,
+        )
+        return clause_bank_type, clause_bank_args
 
     def build_clause_bank(self, X: np.ndarray):
         if self.platform == "CPU":
@@ -291,6 +312,8 @@ class TMBaseModel:
             clause_bank_type, clause_bank_args = self._build_gpu_bank(X=X)
         elif self.platform == "CPU_sparse":
             clause_bank_type, clause_bank_args = self._build_cpu_sparse_bank(X=X)
+        elif self.platform == "FPGA":
+            clause_bank_type, clause_bank_args = self._build_pl_bank(X=X)
         else:
             raise NotImplementedError(f"Could not find platform of type {self.platform}.")
 

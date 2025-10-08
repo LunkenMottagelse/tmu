@@ -69,6 +69,7 @@ add_library(
         src/Attention.c
         src/ClauseBank.c
         src/ClauseBankSparse.c
+        src/ClauseBankPL.c
         src/WeightBank.c
         src/Tools.c
         src/random/pcg32_fast.c

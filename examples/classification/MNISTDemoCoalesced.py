@@ -27,7 +27,9 @@ def main(args):
         s=args.s,
         platform=args.platform,
         weighted_clauses=args.weighted_clauses,
-        focused_negative_sampling=args.focused_negative_sampling
+        focused_negative_sampling=args.focused_negative_sampling,
+        patch_dim=args.dim,
+        seed=1
     )
 
     _LOGGER.info(f"Running {TMCoalescedClassifier} for {args.epochs}")
@@ -69,15 +71,16 @@ def main(args):
 
 
 def default_args(**kwargs):
-    default_clauses = 20000 // 5
+    default_clauses = 64
     parser = argparse.ArgumentParser()
     parser.add_argument("--num-clauses", default=default_clauses, type=int)
     parser.add_argument("--T", default=default_clauses // 4, type=int)
     parser.add_argument("--s", default=10.0, type=float)
     parser.add_argument("--weighted-clauses", default=True, type=bool)
-    parser.add_argument("--platform", default='CPU', type=str)
+    parser.add_argument("--platform", default='FPGA', type=str)
     parser.add_argument("--focused-negative-sampling", default=True, type=bool)
     parser.add_argument("--epochs", default=60, type=int)
+    parser.add_argument("--dim", default=(10, 10), type=tuple)
     args = parser.parse_args()
     for key, value in kwargs.items():
         if key in args.__dict__:
