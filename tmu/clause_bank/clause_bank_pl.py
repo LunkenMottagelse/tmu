@@ -90,7 +90,7 @@ class ClauseBankPL(BaseClauseBank):
         from pynq import Overlay
         from pynq import allocate
 
-        self.ol = Overlay("tmu.bit")
+        self.ol = Overlay("/home/xilinx/modded_tmu/bitfiles/TM_Inference.bit") # Hardcoded path to bitfiles
         self.img_decision_ol = self.ol.axi_dma_0
         self.ie_ol = self.ol.axi_dma_1
         self.weight_ol = self.ol.axi_dma_2
