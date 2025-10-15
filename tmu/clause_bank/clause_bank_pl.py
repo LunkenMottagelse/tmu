@@ -40,6 +40,7 @@ class ClauseBankPL(BaseClauseBank):
         self.number_of_state_bits_ind = int(number_of_state_bits_ind)
         self.batch_size = batch_size
         self.incremental = incremental
+        self.number_of_classes = int(kwargs.get("number_of_classes", 10))
 
         self.clause_output = np.empty(self.number_of_clauses, dtype=np.uint32, order="c")
         self.clause_output_batch = np.empty(self.number_of_clauses * batch_size, dtype=np.uint32, order="c")
