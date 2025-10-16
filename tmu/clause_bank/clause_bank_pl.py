@@ -278,18 +278,19 @@ class ClauseBankPL(BaseClauseBank):
         self.image_buffer[:] = self.pack_image(self.encoded_X_for_pl[e])
 
         # 1: ship to PL
+        pl_timer = tmu.tools.BenchmarkTimer()
+        with pl_timer:
+            self.ie_ol.sendchannel.transfer(self.ie_buffer)
+            self.weight_ol.sendchannel.transfer(self.weight_buffer)
+            self.img_decision_ol.sendchannel.transfer(self.image_buffer)
+            self.img_decision_ol.recvchannel.transfer(self.decision_buffer)
 
-        self.ie_ol.sendchannel.transfer(self.ie_buffer)
-        self.weight_ol.sendchannel.transfer(self.weight_buffer)
-        self.img_decision_ol.sendchannel.transfer(self.image_buffer)
-        self.img_decision_ol.recvchannel.transfer(self.decision_buffer)
+            # 2: capture output
 
-        # 2: capture output
-
-        self.img_decision_ol.sendchannel.wait()
-        self.ie_ol.sendchannel.wait()
-        self.weight_ol.sendchannel.wait()
-        self.img_decision_ol.recvchannel.wait()
+            self.img_decision_ol.sendchannel.wait()
+            self.ie_ol.sendchannel.wait()
+            self.weight_ol.sendchannel.wait()
+            self.img_decision_ol.recvchannel.wait()
 
         # 3: store output in correct location.
         # class sums -> First NClasses transfers contain class sums
@@ -317,23 +318,27 @@ class ClauseBankPL(BaseClauseBank):
         self.image_buffer.flush()
         self.decision_buffer.flush()
 
-        # Classic method
-        xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
-        la_p = ffi.cast("unsigned int *", literal_active.ctypes.data)
+        classic_timer = tmu.tools.BenchmarkTimer()
+        with classic_timer:
+            # Classic method
+            xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
+            la_p = ffi.cast("unsigned int *", literal_active.ctypes.data)
 
-        lib.cb_calculate_clause_outputs_update(
-            self.ptr_ta_state,
-            self.number_of_clauses,
-            self.number_of_literals,
-            self.number_of_state_bits_ta,
-            self.number_of_patches,
-            self.co_p,
-            la_p,
-            xi_p
-        )
+            lib.cbpl_calculate_clause_outputs_update(
+                self.ptr_ta_state,
+                self.number_of_clauses,
+                self.number_of_literals,
+                self.number_of_state_bits_ta,
+                self.number_of_patches,
+                self.co_p,
+                la_p,
+                xi_p
+            )
 
         _LOGGER.info(self.clause_output)
         _LOGGER.info("Clause output from classic ^")
+        
+        _LOGGER.info(f"PL time: {pl_timer.elapsed():.2f} s, Classic time: {classic_timer.elapsed():.2f} s")
         return self.clause_output
 
     def type_i_feedback(
