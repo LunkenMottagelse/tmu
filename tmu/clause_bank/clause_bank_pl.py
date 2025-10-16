@@ -41,6 +41,9 @@ class ClauseBankPL(BaseClauseBank):
         self.batch_size = batch_size
         self.incremental = incremental
         self.number_of_classes = int(kwargs.get("number_of_classes", 10))
+        
+        # Store callback function to get weights from weight banks
+        self.get_weights_callback = kwargs.get("get_weights_callback", None)
 
         self.clause_output = np.empty(self.number_of_clauses, dtype=np.uint32, order="c")
         self.clause_output_batch = np.empty(self.number_of_clauses * batch_size, dtype=np.uint32, order="c")
@@ -206,6 +209,21 @@ class ClauseBankPL(BaseClauseBank):
 
         return self.clause_output_batch.reshape((self.batch_size, self.number_of_clauses))[e % self.batch_size, :]
 
+    def weight_packing_bits_32(bits_per_weight, model):
+        # Pack weights into 32-bit chunks
+        packed_weights = []
+        num_weights_per_chunk = 32 // bits_per_weight
+        for i in range(0, model.shape[0]):
+            if i % num_weights_per_chunk == 0:
+                chunk = 0
+            chunk |= (model[i] & ((1 << bits_per_weight) - 1)) << (i % num_weights_per_chunk * bits_per_weight)
+            
+            #  [--------------------Chunk is full-------------------------]    [-----Last element------]
+            if ((i % num_weights_per_chunk) == (num_weights_per_chunk) - 1) or (i == model.shape[0] - 1):
+                packed_weights.append(chunk)
+        return np.array(packed_weights, dtype=np.uint32)
+
+    
     def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
 
         lib.cbpl_included_literals(
@@ -215,12 +233,19 @@ class ClauseBankPL(BaseClauseBank):
             self.number_of_state_bits_ta,
             self.ptr_actions
         )
-        # Change weights into correct format for PL
-        weights = self.weight_bank.get_weights()
+        
+        # Get weights using callback function
+        if self.get_weights_callback is None:
+            raise RuntimeError("get_weights_callback is not set. Please provide a callback function when creating ClauseBankPL.")
+        
+        # Get all weights from all weight banks using the callback
+        weights = self.get_weights_callback()
         weights = weights.transpose()  # Flip weights to be [classes, clauses]
 
+        weights_packed = self.pack_weight_bits_32(self.bits_per_weight, weights.flatten())
+
         self.image_buffer[:] = encoded_X.shape[e, :, ::-1].flatten()  # Reverse bit order of x-axis
-        self.weight_buffer[:] = self.pack_weight_bits_32(self.bits_per_weight, weights.flatten())
+        self.weight_buffer[:] = weights_packed[::-1]
         self.ie_buffer[:] = self.actions[::-1]
 
         # 1: ship to PL

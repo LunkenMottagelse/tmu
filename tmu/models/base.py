@@ -212,8 +212,8 @@ class TMBaseModel:
 
         self.number_of_classes = self.init_num_classes(X, Y)
         self.init_before(X, Y)
-        self.init_clause_bank(X, Y)
         self.init_weight_bank(X, Y)
+        self.init_clause_bank(X, Y)
         self.init_after(X, Y)
         self.initialized = True
 
@@ -290,6 +290,21 @@ class TMBaseModel:
         
         number_of_classes = int(np.max(Y) + 1) if Y is not None else 10
         
+        # Create callback function to get weights from weight banks
+        # This will be called during calculate_clause_outputs_update
+        def get_weights_callback():
+            if hasattr(self, 'weight_banks'):
+                # MultiWeightBankMixin case - get weights from all banks
+                weights_list = []
+                for i in range(number_of_classes):
+                    weights_list.append(self.weight_banks[i].get_weights())
+                return np.array(weights_list).T  # Shape: [clauses, classes]
+            elif hasattr(self, 'weight_bank'):
+                # SingleWeightBankMixin case
+                return self.weight_bank.get_weights()
+            else:
+                raise RuntimeError("No weight bank found in the model")
+        
         clause_bank_args = dict(
             X_shape=X.shape,
             d=self.d,
@@ -306,6 +321,7 @@ class TMBaseModel:
             type_ia_ii_feedback_ratio=self.type_ia_ii_feedback_ratio,
             seed=self.seed,
             number_of_classes=number_of_classes,
+            get_weights_callback=get_weights_callback,
         )
         return clause_bank_type, clause_bank_args
 
