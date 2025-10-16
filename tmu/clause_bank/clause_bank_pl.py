@@ -322,7 +322,6 @@ class ClauseBankPL(BaseClauseBank):
         with classic_timer:
             # Classic method
             xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
-            la_p = ffi.cast("unsigned int *", literal_active.ctypes.data)
 
             lib.cbpl_calculate_clause_outputs_update(
                 self.ptr_ta_state,
@@ -331,7 +330,6 @@ class ClauseBankPL(BaseClauseBank):
                 self.number_of_state_bits_ta,
                 self.number_of_patches,
                 self.co_p,
-                la_p,
                 xi_p
             )
 
