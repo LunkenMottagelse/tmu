@@ -1,4 +1,5 @@
 
+from xml.parsers.expat import model
 from tmu.tmulib import ffi, lib
 import tmu.tools
 from tmu.clause_bank.base_clause_bank import BaseClauseBank
@@ -248,15 +249,19 @@ class ClauseBankPL(BaseClauseBank):
             packed_image[i] = packed_row
         return np.concatenate(packed_image).astype(np.uint32)
     
-    def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
+    def pack_model(self):
+        literals = self.get_literals()
+        modified_model = []
+        for row in literals:
+            packed_row = self.pack_bits_32(row[::-1])
+            modified_model.append(packed_row)
 
-        lib.cbpl_included_literals(
-            self.ptr_ta_state,
-            self.number_of_clauses,
-            self.number_of_literals,
-            self.number_of_state_bits_ta,
-            self.ptr_actions
-        )
+        modified_model = np.array(modified_model, dtype=object)
+
+        flattened_model = np.concatenate(modified_model).astype(np.uint32)
+        return flattened_model
+
+    def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
         
         # Get weights using callback function
         if self.get_weights_callback is None:
@@ -267,10 +272,10 @@ class ClauseBankPL(BaseClauseBank):
         weights = weights.transpose()  # Flip weights to be [classes, clauses]
 
         weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights.flatten())
-
-        self.image_buffer[:] = self.pack_image(self.encoded_X_for_pl[e])
         self.weight_buffer[:] = weights_packed[::-1]
-        self.ie_buffer[:] = self.actions[::-1]
+
+        self.ie_buffer[:] = self.pack_model()
+        self.image_buffer[:] = self.pack_image(self.encoded_X_for_pl[e])
 
         # 1: ship to PL
 
