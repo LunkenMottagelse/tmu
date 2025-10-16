@@ -41,9 +41,8 @@ class ClauseBankPL(BaseClauseBank):
         self.batch_size = batch_size
         self.incremental = incremental
         self.number_of_classes = int(kwargs.get("number_of_classes", 10))
-        
-        # Store callback function to get weights from weight banks
         self.get_weights_callback = kwargs.get("get_weights_callback", None)
+        self.encoded_X_for_pl = kwargs.get("encoded_X_for_pl", None)
 
         self.clause_output = np.empty(self.number_of_clauses, dtype=np.uint32, order="c")
         self.clause_output_batch = np.empty(self.number_of_clauses * batch_size, dtype=np.uint32, order="c")
@@ -209,7 +208,7 @@ class ClauseBankPL(BaseClauseBank):
 
         return self.clause_output_batch.reshape((self.batch_size, self.number_of_clauses))[e % self.batch_size, :]
 
-    def weight_packing_bits_32(bits_per_weight, model):
+    def weight_packing_bits_32(self, bits_per_weight, model):
         # Pack weights into 32-bit chunks
         packed_weights = []
         num_weights_per_chunk = 32 // bits_per_weight
@@ -223,6 +222,31 @@ class ClauseBankPL(BaseClauseBank):
                 packed_weights.append(chunk)
         return np.array(packed_weights, dtype=np.uint32)
 
+    # Pack bits into 32-bit ints. assuming bits are in big-endian order (MSB first element)
+    def pack_bits_32(self, bits):
+        # Pad with zeros to make length multiple of 32
+        padded_bits = bits.copy()
+        while len(padded_bits) % 32 != 0:
+            padded_bits.insert(0, 0) # pad from the MSB
+        
+        # Convert to numpy array
+        bit_array = np.array(padded_bits, dtype=np.uint8)
+        
+        # Reshape into groups of 32 bits
+        bit_groups = bit_array.reshape(-1, 32)
+        
+        # Convert each group of 32 bits to a 32-bit integer
+        powers_of_2 = 2 ** np.arange(31, -1, -1)  # [2^31, 2^30, ..., 2^1, 2^0]
+        packed_32bit = np.dot(bit_groups, powers_of_2)
+        
+        return packed_32bit.astype(np.uint32)
+
+    def pack_image(self, image):
+        packed_image = np.zeros((image.shape[0], (image.shape[1] + 31) // 32), dtype=np.uint32)
+        for i, row in enumerate(image):
+            packed_row = self.pack_bits_32(row[::-1].tolist()) # Invert row for little-endian bit order
+            packed_image[i] = packed_row
+        return np.concatenate(packed_image).astype(np.uint32)
     
     def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
 
@@ -242,9 +266,9 @@ class ClauseBankPL(BaseClauseBank):
         weights = self.get_weights_callback()
         weights = weights.transpose()  # Flip weights to be [classes, clauses]
 
-        weights_packed = self.pack_weight_bits_32(self.bits_per_weight, weights.flatten())
+        weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights.flatten())
 
-        self.image_buffer[:] = encoded_X.shape[e, :, ::-1].flatten()  # Reverse bit order of x-axis
+        self.image_buffer[:] = self.pack_image(self.encoded_X_for_pl[e])
         self.weight_buffer[:] = weights_packed[::-1]
         self.ie_buffer[:] = self.actions[::-1]
 
@@ -496,16 +520,3 @@ class ClauseBankPL(BaseClauseBank):
 
         return X.reshape((1, -1)), target_value
 
-    def pack_weight_bits_32(self, bits_per_weight, model):
-        # Pack weights into 32-bit chunks
-        packed_weights = []
-        num_weights_per_chunk = 32 // bits_per_weight
-        for i in range(0, model.shape[0]):
-            if i % num_weights_per_chunk == 0:
-                chunk = 0
-            chunk |= (model[i] & ((1 << bits_per_weight) - 1)) << (i % num_weights_per_chunk * bits_per_weight)
-            
-            #  [--------------------Chunk is full-------------------------]    [-----Last element------]
-            if ((i % num_weights_per_chunk) == (num_weights_per_chunk) - 1) or (i == model.shape[0] - 1):
-                packed_weights.append(chunk)
-        return np.array(packed_weights, dtype=np.uint32)
