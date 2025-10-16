@@ -300,10 +300,10 @@ class ClauseBankPL(BaseClauseBank):
         _LOGGER.info(f"Class sums from PL: {class_sums}")
         
         # NOTE: these are stored densely
-        self.clause_output = self.decision_buffer[self.number_of_classes:self.number_of_classes + math.ceil(self.number_of_clauses / 32)] # Then N transfers contain clause outputs
+        clause_output_pl = self.decision_buffer[self.number_of_classes:self.number_of_classes + math.ceil(self.number_of_clauses / 32)] # Then N transfers contain clause outputs
         #patches = self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):]  # Then remaining transfers contain selected patches
 
-        _LOGGER.info(f"Clause output from PL: {self.clause_output}")
+        _LOGGER.info(f"Clause output from PL: {clause_output_pl}")
 
         # Then flush
         self.ie_buffer.flush()
