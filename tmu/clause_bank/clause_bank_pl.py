@@ -297,17 +297,19 @@ class ClauseBankPL(BaseClauseBank):
         # selected_patches -> Then remaining transfers contain selected patches
         class_sums = self.decision_buffer[:self.number_of_classes]  # First NClasses transfers contain class sums
         
-        _LOGGER.info(f"Class sums from PL: {class_sums}")
+        _LOGGER.info("Class sums from PL v")
+        _LOGGER.info(class_sums)
         
         # NOTE: these are stored densely
         expanded_clause_output = np.zeros(self.number_of_clauses, dtype=np.uint32)
         clause_output_pl = self.decision_buffer[self.number_of_classes:self.number_of_classes + math.ceil(self.number_of_clauses / 32)] # Then N transfers contain clause outputs
         for i in range(self.number_of_clauses):
-            if clause_output_pl[i // 32] >> (i % 32) & 1:
+            if clause_output_pl[(i // 32)] >> (i % 32) & 1:
                 expanded_clause_output[i] = 1
         #patches = self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):]  # Then remaining transfers contain selected patches
 
-        _LOGGER.info(f"Clause output from PL: {expanded_clause_output}")
+        _LOGGER.info("Clause output from PL v")
+        _LOGGER.info(expanded_clause_output)
 
         # Then flush
         self.ie_buffer.flush()
@@ -330,7 +332,8 @@ class ClauseBankPL(BaseClauseBank):
             xi_p
         )
 
-        _LOGGER.info(f"Clause output from classic: {self.clause_output}")
+        _LOGGER.info(self.clause_output)
+        _LOGGER.info("Clause output from classic ^")
         return self.clause_output
 
     def type_i_feedback(
