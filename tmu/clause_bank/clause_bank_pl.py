@@ -253,7 +253,7 @@ class ClauseBankPL(BaseClauseBank):
         literals = self.get_literals()
         modified_model = []
         for row in literals:
-            packed_row = self.pack_bits_32(row[::-1])
+            packed_row = self.pack_bits_32(row[::-1].tolist())
             modified_model.append(packed_row)
 
         modified_model = np.array(modified_model, dtype=object)
