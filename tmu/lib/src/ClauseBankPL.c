@@ -544,7 +544,7 @@ void cbpl_get_literals(
             unsigned int pos = j * number_of_ta_chunks * number_of_state_bits + ta_chunk * number_of_state_bits + number_of_state_bits-1;
 
             // Check if the literal is present (bit is set) in the TA state array.
-            if ((ta_state[pos] & (1 << chunk_pos)) > 0) {
+            if (ta_state[pos] & (1 << chunk_pos)) {
                 // Increment the count of the literal in the result array.
                 unsigned int result_pos = j * number_of_literals + k;
                 result[result_pos] = 1;

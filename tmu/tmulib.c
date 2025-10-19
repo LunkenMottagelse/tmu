@@ -2243,6 +2243,7 @@ static inline void cbpl_dec(
 }
 
 /* Calculate the output of each clause using the actions of each Tsetline Automaton. */
+// Note: No longer needed
 static inline void cbpl_calculate_clause_output_feedback(unsigned int *ta_state, unsigned int *output_one_patches, unsigned int *clause_output, unsigned int *clause_patch, int number_of_ta_chunks, int number_of_state_bits, unsigned int filter, int number_of_patches, unsigned int *Xi)
 {
 	int output_one_patches_count = 0;
@@ -2411,7 +2412,7 @@ static inline unsigned int cbpl_calculate_clause_output_predict(unsigned int *ta
 	return(0);
 }
 
-
+// Necessary change is managing Xi as consecutive (already handled in PL)
 void cbpl_type_i_feedback(
         unsigned int *ta_state,
         unsigned int *feedback_to_ta,
@@ -2491,6 +2492,7 @@ void cbpl_type_i_feedback(
 	}
 }
 
+// Same here, handle Xi as consecutive
 void cbpl_type_ii_feedback(
         unsigned int *ta_state,
         unsigned int *output_one_patches,
@@ -2704,7 +2706,7 @@ void cbpl_get_literals(
             unsigned int pos = j * number_of_ta_chunks * number_of_state_bits + ta_chunk * number_of_state_bits + number_of_state_bits-1;
 
             // Check if the literal is present (bit is set) in the TA state array.
-            if ((ta_state[pos] & (1 << chunk_pos)) > 0) {
+            if (ta_state[pos] & (1 << chunk_pos)) {
                 // Increment the count of the literal in the result array.
                 unsigned int result_pos = j * number_of_literals + k;
                 result[result_pos] = 1;
