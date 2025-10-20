@@ -298,8 +298,8 @@ class ClauseBankPL(BaseClauseBank):
         # selected_patches -> Then remaining transfers contain selected patches
         class_sums = self.decision_buffer[:self.number_of_classes]  # First NClasses transfers contain class sums
         
-        _LOGGER.info("Class sums from PL v")
-        _LOGGER.info(class_sums)
+        # _LOGGER.info("Class sums from PL v")
+        # _LOGGER.info(class_sums)
         
         # NOTE: these are stored densely
         expanded_clause_output = np.zeros(self.number_of_clauses, dtype=np.uint32)
@@ -309,8 +309,8 @@ class ClauseBankPL(BaseClauseBank):
                 expanded_clause_output[i] = 1
         #patches = self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):]  # Then remaining transfers contain selected patches
 
-        _LOGGER.info("Clause output from PL v")
-        _LOGGER.info(expanded_clause_output)
+        # _LOGGER.info("Clause output from PL v")
+        # _LOGGER.info(expanded_clause_output)
 
         # Then flush
         self.ie_buffer.flush()
@@ -333,10 +333,24 @@ class ClauseBankPL(BaseClauseBank):
                 xi_p
             )
 
-        _LOGGER.info(self.clause_output)
-        _LOGGER.info("Clause output from classic ^")
+        # _LOGGER.info(self.clause_output)
+        # _LOGGER.info("Clause output from classic ^")
         
-        _LOGGER.info(f"PL time: {pl_timer.elapsed():.2f} s, Classic time: {classic_timer.elapsed():.2f} s")
+        # _LOGGER.info(f"PL time: {pl_timer.elapsed():.2f} s, Classic time: {classic_timer.elapsed():.2f} s")
+
+        if not np.array_equal(self.clause_output, expanded_clause_output):
+            _LOGGER.warning(f"Mismatch between PL and classic TM clause outputs in example {e}!")
+            _LOGGER.warning(f"PL output: {expanded_clause_output}")
+            _LOGGER.warning(f"Classic output: {self.clause_output}")
+
+            # Find the clauses that differ
+            for i in range(self.number_of_clauses):
+                if self.clause_output[i] != expanded_clause_output[i]:
+                    _LOGGER.warning(f"Clause {i} differs: PL={expanded_clause_output[i]}, Classic={self.clause_output[i]}")
+                    # Log the content of the clause
+                    literals = self.get_literals()[i]
+                    _LOGGER.warning(f"Literals for clause {i}: {literals}")
+
         return self.clause_output
 
     def type_i_feedback(
