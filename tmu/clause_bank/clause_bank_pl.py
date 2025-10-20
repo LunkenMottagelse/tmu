@@ -243,7 +243,9 @@ class ClauseBankPL(BaseClauseBank):
         return packed_32bit.astype(np.uint32)
 
     def pack_image(self, image):
-        packed_image = np.zeros((image.shape[0], (image.shape[1] + 31) // 32), dtype=np.uint32)
+        # Testing image transpose
+        packed_image = np.zeros((image.shape[1], (image.shape[0] + 31) // 32), dtype=np.uint32)
+        image = np.transpose(image)  # Transpose to match expected layout
         for i, row in enumerate(image):
             packed_row = self.pack_bits_32(row[::-1].tolist()) # Invert row for little-endian bit order
             packed_image[i] = packed_row
@@ -269,7 +271,7 @@ class ClauseBankPL(BaseClauseBank):
         
         # Get all weights from all weight banks using the callback
         weights = self.get_weights_callback()
-        weights = weights.transpose()  # Flip weights to be [classes, clauses]
+        weights = np.transpose(weights)  # Flip weights to be [classes, clauses]
 
         weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights.flatten())
         self.weight_buffer[:] = weights_packed[::-1]
