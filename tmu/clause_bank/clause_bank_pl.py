@@ -247,7 +247,7 @@ class ClauseBankPL(BaseClauseBank):
         packed_image = np.zeros((image.shape[1], (image.shape[0] + 31) // 32), dtype=np.uint32)
         image = np.transpose(image)  # Transpose to match expected layout
         for i, row in enumerate(image):
-            packed_row = self.pack_bits_32(row[::-1].tolist()) # Invert row for little-endian bit order
+            packed_row = self.pack_bits_32(row.tolist()) # Invert row for little-endian bit order
             packed_image[i] = packed_row
         return np.concatenate(packed_image).astype(np.uint32)
     
@@ -255,7 +255,7 @@ class ClauseBankPL(BaseClauseBank):
         literals = self.get_literals()
         modified_model = []
         for row in literals:
-            packed_row = self.pack_bits_32(row.tolist())
+            packed_row = self.pack_bits_32(row[::-1].tolist())
             modified_model.append(packed_row)
 
         modified_model = np.array(modified_model, dtype=object)
