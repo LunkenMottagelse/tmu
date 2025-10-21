@@ -245,9 +245,9 @@ class ClauseBankPL(BaseClauseBank):
     def pack_image(self, image):
         # Testing image transpose
         packed_image = np.zeros((image.shape[1], (image.shape[0] + 31) // 32), dtype=np.uint32)
-        image = np.transpose(image)  # Transpose to match expected layout
+        # image = np.transpose(image)  # Transpose to match expected layout
         for i, row in enumerate(image):
-            packed_row = self.pack_bits_32(row.tolist()) # Invert row for little-endian bit order
+            packed_row = self.pack_bits_32(row[::-1].tolist()) # Invert row for little-endian bit order
             packed_image[i] = packed_row
         return np.concatenate(packed_image).astype(np.uint32)
     
