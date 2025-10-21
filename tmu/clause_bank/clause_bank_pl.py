@@ -306,67 +306,66 @@ class ClauseBankPL(BaseClauseBank):
         # _LOGGER.info(class_sums)
         
         # NOTE: these are stored densely
-        expanded_clause_output = np.zeros(self.number_of_clauses, dtype=np.uint32)
         clause_output_pl = self.decision_buffer[self.number_of_classes:self.number_of_classes + math.ceil(self.number_of_clauses / 32)] # Then N transfers contain clause outputs
         for i in range(self.number_of_clauses):
             if clause_output_pl[(i // 32)] >> (i % 32) & 1:
-                expanded_clause_output[i] = 1
+                self.clause_output[i] = 1
         #patches = self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):]  # Then remaining transfers contain selected patches
 
         # _LOGGER.info("Clause output from PL v")
-        # _LOGGER.info(expanded_clause_output)
+        # _LOGGER.info(self.clause_output)
 
         # Then flush
-        self.ie_buffer.flush()
-        self.weight_buffer.flush()
-        self.image_buffer.flush()
-        self.decision_buffer.flush()
+        # self.ie_buffer.flush()
+        # self.weight_buffer.flush()
+        # self.image_buffer.flush()
+        # self.decision_buffer.flush()
 
-        classic_timer = tmu.tools.BenchmarkTimer()
-        with classic_timer:
-            # Classic method
-            xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
+        # classic_timer = tmu.tools.BenchmarkTimer()
+        # with classic_timer:
+        #     # Classic method
+        #     xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
 
-            lib.cbpl_calculate_clause_outputs_update(
-                self.ptr_ta_state,
-                self.number_of_clauses,
-                self.number_of_literals,
-                self.number_of_state_bits_ta,
-                self.number_of_patches,
-                self.co_p,
-                xi_p
-            )
+        #     lib.cbpl_calculate_clause_outputs_update(
+        #         self.ptr_ta_state,
+        #         self.number_of_clauses,
+        #         self.number_of_literals,
+        #         self.number_of_state_bits_ta,
+        #         self.number_of_patches,
+        #         self.co_p,
+        #         xi_p
+        #     )
 
         # _LOGGER.info(self.clause_output)
         # _LOGGER.info("Clause output from classic ^")
         
         # _LOGGER.info(f"PL time: {pl_timer.elapsed():.2f} s, Classic time: {classic_timer.elapsed():.2f} s")
 
-        if not np.array_equal(self.clause_output, expanded_clause_output):
-            _LOGGER.warning("="*60)
-            _LOGGER.warning(f"Mismatch between PL and classic TM clause outputs in example {e}!")
-            _LOGGER.warning(f"PL output: {expanded_clause_output}")
-            _LOGGER.warning(f"Classic output: {self.clause_output}")
+        # if not np.array_equal(self.clause_output, expanded_clause_output):
+        #     _LOGGER.warning("="*60)
+        #     _LOGGER.warning(f"Mismatch between PL and classic TM clause outputs in example {e}!")
+        #     _LOGGER.warning(f"PL output: {expanded_clause_output}")
+        #     _LOGGER.warning(f"Classic output: {self.clause_output}")
 
-            # Find the clauses that differ
-            for i in range(self.number_of_clauses):
-                if self.clause_output[i] != expanded_clause_output[i]:
-                    _LOGGER.warning(f"Clause {i} differs: PL={expanded_clause_output[i]}, Classic={self.clause_output[i]}")
-                    # Log the content of the clause
-                    literals = self.get_literals()[i]
-                    _LOGGER.warning(f"Literals for clause {i}: {literals}")
-            _LOGGER.warning("-"*60)
-            _LOGGER.warning("Packed Model:")
-            _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(model_packed))
-            _LOGGER.warning("-"*60)
-            _LOGGER.warning("Packed Image:")
-            _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(image_packed))
-            _LOGGER.warning("-"*60)
-            _LOGGER.warning("Packed Weights:")
-            _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(weights_packed))
-            _LOGGER.warning("="*60)
-        else:
-            _LOGGER.info(f"PL and classic TM clause outputs match for example {e}.")
+        #     # Find the clauses that differ
+        #     for i in range(self.number_of_clauses):
+        #         if self.clause_output[i] != expanded_clause_output[i]:
+        #             _LOGGER.warning(f"Clause {i} differs: PL={expanded_clause_output[i]}, Classic={self.clause_output[i]}")
+        #             # Log the content of the clause
+        #             literals = self.get_literals()[i]
+        #             _LOGGER.warning(f"Literals for clause {i}: {literals}")
+        #     _LOGGER.warning("-"*60)
+        #     _LOGGER.warning("Packed Model:")
+        #     _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(model_packed))
+        #     _LOGGER.warning("-"*60)
+        #     _LOGGER.warning("Packed Image:")
+        #     _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(image_packed))
+        #     _LOGGER.warning("-"*60)
+        #     _LOGGER.warning("Packed Weights:")
+        #     _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(weights_packed))
+        #     _LOGGER.warning("="*60)
+        # else:
+        #     _LOGGER.info(f"PL and classic TM clause outputs match for example {e}.")
 
         return self.clause_output
 
