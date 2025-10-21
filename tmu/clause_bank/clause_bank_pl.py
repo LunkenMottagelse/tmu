@@ -276,8 +276,10 @@ class ClauseBankPL(BaseClauseBank):
         weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights.flatten())
         self.weight_buffer[:] = weights_packed[::-1]
 
-        self.ie_buffer[:] = self.pack_model()
-        self.image_buffer[:] = self.pack_image(self.encoded_X_for_pl[e])
+        model_packed = self.pack_model()
+        self.ie_buffer[:] = model_packed
+        image_packed = self.pack_image(self.encoded_X_for_pl[e])
+        self.image_buffer[:] = image_packed
 
         # 1: ship to PL
         pl_timer = tmu.tools.BenchmarkTimer()
@@ -341,6 +343,7 @@ class ClauseBankPL(BaseClauseBank):
         # _LOGGER.info(f"PL time: {pl_timer.elapsed():.2f} s, Classic time: {classic_timer.elapsed():.2f} s")
 
         if not np.array_equal(self.clause_output, expanded_clause_output):
+            _LOGGER.warning("="*60)
             _LOGGER.warning(f"Mismatch between PL and classic TM clause outputs in example {e}!")
             _LOGGER.warning(f"PL output: {expanded_clause_output}")
             _LOGGER.warning(f"Classic output: {self.clause_output}")
@@ -352,6 +355,18 @@ class ClauseBankPL(BaseClauseBank):
                     # Log the content of the clause
                     literals = self.get_literals()[i]
                     _LOGGER.warning(f"Literals for clause {i}: {literals}")
+            _LOGGER.warning("-"*60)
+            _LOGGER.warning("Packed Model:")
+            _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(model_packed))
+            _LOGGER.warning("-"*60)
+            _LOGGER.warning("Packed Image:")
+            _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(image_packed))
+            _LOGGER.warning("-"*60)
+            _LOGGER.warning("Packed Weights:")
+            _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(weights_packed))
+            _LOGGER.warning("="*60)
+        else:
+            _LOGGER.info(f"PL and classic TM clause outputs match for example {e}.")
 
         return self.clause_output
 
