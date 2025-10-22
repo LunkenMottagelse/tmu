@@ -321,8 +321,7 @@ class TMBaseModel:
             type_ia_ii_feedback_ratio=self.type_ia_ii_feedback_ratio,
             seed=self.seed,
             number_of_classes=number_of_classes,
-            get_weights_callback=get_weights_callback,
-            encoded_X_for_pl=X
+            get_weights_callback=get_weights_callback
         )
         return clause_bank_type, clause_bank_args
 

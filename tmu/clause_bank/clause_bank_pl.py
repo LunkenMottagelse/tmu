@@ -43,7 +43,6 @@ class ClauseBankPL(BaseClauseBank):
         self.incremental = incremental
         self.number_of_classes = int(kwargs.get("number_of_classes", 10))
         self.get_weights_callback = kwargs.get("get_weights_callback", None)
-        self.encoded_X_for_pl = kwargs.get("encoded_X_for_pl", None)
 
         self.clause_output = np.empty(self.number_of_clauses, dtype=np.uint32, order="c")
         self.clause_output_batch = np.empty(self.number_of_clauses * batch_size, dtype=np.uint32, order="c")
@@ -99,15 +98,16 @@ class ClauseBankPL(BaseClauseBank):
         self.ie_ol = self.ol.axi_dma_1
         self.weight_ol = self.ol.axi_dma_2
 
-        packed_image_size = self.dim[1] * math.ceil(self.dim[2] / 32)
+        packed_image_size = self.dim[1] * math.ceil(self.dim[2] / 32.0)
         self.bits_per_weight = 9  # FIXME: Hardcoded for now, but could be parameterized
         packed_weight_size = math.ceil(self.number_of_classes * self.number_of_clauses / math.floor(32 / self.bits_per_weight))
-        packed_clauses_size = math.ceil(self.number_of_clauses / 32)
+        packed_clauses_size = math.ceil(self.number_of_clauses / 32.0)
+        self.packed_patch_size = math.ceil(self.number_of_literals / 32.0)
 
         self.image_buffer = allocate(shape=(packed_image_size,), dtype=np.uint32, cacheable=1)
         self.weight_buffer = allocate(shape=(packed_weight_size,), dtype=np.uint32, cacheable=1)
         self.ie_buffer = allocate(shape=(self.number_of_clauses * self.number_of_ta_chunks,), dtype=np.uint32, cacheable=1)
-        self.decision_buffer = allocate(shape=(self.number_of_classes + packed_clauses_size,), dtype=np.uint32, cacheable=1)
+        self.decision_buffer = allocate(shape=(self.number_of_classes + packed_clauses_size + self.packed_patch_size*self.number_of_clauses,), dtype=np.uint32, cacheable=1)
 
     def _cffi_init(self):
         self.co_p = ffi.cast("unsigned int *", self.clause_output.ctypes.data)  # clause_output
@@ -263,12 +263,7 @@ class ClauseBankPL(BaseClauseBank):
         flattened_model = np.concatenate(modified_model).astype(np.uint32)
         return flattened_model
 
-    def calculate_clause_outputs_update_fpga(self, literal_active, encoded_X, e):
-        _LOGGER.info(f"Calculating clause outputs update on FPGA for example {e}")
-        return self.calculate_clause_outputs_update(literal_active, encoded_X, e)
-
-    def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
-        
+    def calculate_clause_outputs_update_fpga(self, X_train, e):
         # Get weights using callback function
         if self.get_weights_callback is None:
             raise RuntimeError("get_weights_callback is not set. Please provide a callback function when creating ClauseBankPL.")
@@ -282,7 +277,7 @@ class ClauseBankPL(BaseClauseBank):
 
         model_packed = self.pack_model()
         self.ie_buffer[:] = model_packed
-        image_packed = self.pack_image(self.encoded_X_for_pl[e])
+        image_packed = self.pack_image(X_train[e])
         self.image_buffer[:] = image_packed
 
         # 1: ship to PL
@@ -314,8 +309,8 @@ class ClauseBankPL(BaseClauseBank):
         for i in range(self.number_of_clauses):
             if clause_output_pl[(i // 32)] >> (i % 32) & 1:
                 self.clause_output[i] = 1
-        #patches = self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):]  # Then remaining transfers contain selected patches
-
+        patches = np.array(self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):])  # Then remaining transfers contain selected patches
+        patches = patches.reshape((self.number_of_clauses, self.packed_patch_size))
         # _LOGGER.info("Clause output from PL v")
         # _LOGGER.info(self.clause_output)
 
@@ -324,22 +319,6 @@ class ClauseBankPL(BaseClauseBank):
         # self.weight_buffer.flush()
         # self.image_buffer.flush()
         # self.decision_buffer.flush()
-
-        # classic_timer = tmu.tools.BenchmarkTimer()
-        # with classic_timer:
-        #     # Classic method
-        #     xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
-
-        #     lib.cbpl_calculate_clause_outputs_update(
-        #         self.ptr_ta_state,
-        #         self.number_of_clauses,
-        #         self.number_of_literals,
-        #         self.number_of_state_bits_ta,
-        #         self.number_of_patches,
-        #         self.co_p,
-        #         xi_p
-        #     )
-
         # _LOGGER.info(self.clause_output)
         # _LOGGER.info("Clause output from classic ^")
         
@@ -371,34 +350,51 @@ class ClauseBankPL(BaseClauseBank):
         # else:
         #     _LOGGER.info(f"PL and classic TM clause outputs match for example {e}.")
 
+
+
+        return self.clause_output, class_sums, patches
+
+    def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
+        # Classic method
+        xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
+
+        lib.cbpl_calculate_clause_outputs_update(
+            self.ptr_ta_state,
+            self.number_of_clauses,
+            self.number_of_literals,
+            self.number_of_state_bits_ta,
+            self.number_of_patches,
+            self.co_p,
+            xi_p
+        )
+
         return self.clause_output
 
     def type_i_feedback(
         self,
         update_p,
         clause_active,
-        literal_active,
-        encoded_X,
-        e
+        clause_patches,
+        clause_outputs
     ):
         # encoded_X is wrong here, must be the randomly selected patches from PL. 
-        ptr_xi = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
+        ptr_cp = ffi.cast("unsigned int *", clause_patches.ctypes.data)
         ptr_clause_active = ffi.cast("unsigned int *", clause_active.ctypes.data)
+        ptr_clause_outputs = ffi.cast("unsigned int *", clause_outputs.ctypes.data)
         lib.cbpl_type_i_feedback(
             self.ptr_ta_state,
             self.ptr_feedback_to_ta,
-            self.ptr_output_one_patches,
             self.number_of_clauses,
             self.number_of_literals,
             self.number_of_state_bits_ta,
-            self.number_of_patches,
             update_p,
             self.s,
             self.boost_true_positive_feedback,
             self.reuse_random_feedback,
             self.max_included_literals,
             ptr_clause_active,
-            ptr_xi
+            ptr_cp,
+            ptr_clause_outputs
         )
 
         self.incremental_clause_evaluation_initialized = False
@@ -407,55 +403,23 @@ class ClauseBankPL(BaseClauseBank):
         self,
         update_p,
         clause_active,
-        literal_active,
-        encoded_X,
-        e
+        clause_patches,
+        clause_outputs,
     ):
-        ptr_xi = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
+        ptr_cp = ffi.cast("unsigned int *", clause_patches.ctypes.data)
         ptr_clause_active = ffi.cast("unsigned int *", clause_active.ctypes.data)
+        ptr_clause_outputs = ffi.cast("unsigned int *", clause_outputs.ctypes.data)
 
         lib.cbpl_type_ii_feedback(
             self.ptr_ta_state,
-            self.ptr_output_one_patches,
             self.number_of_clauses,
             self.number_of_literals,
             self.number_of_state_bits_ta,
             self.number_of_patches,
             update_p,
             ptr_clause_active,
-            ptr_xi
-        )
-
-        self.incremental_clause_evaluation_initialized = False
-
-
-    def type_iii_feedback(
-            self,
-            update_p,
-            clause_active,
-            literal_active,
-            encoded_X,
-            e,
-            target
-    ):
-        ptr_xi = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
-        ptr_clause_active = ffi.cast("unsigned int *", clause_active.ctypes.data)
-
-        lib.cbpl_type_iii_feedback(
-            self.ptr_ta_state,
-            self.ptr_ta_state_ind,
-            self.ptr_clause_and_target,
-            self.ptr_output_one_patches,
-            self.number_of_clauses,
-            self.number_of_literals,
-            self.number_of_state_bits_ta,
-            self.number_of_state_bits_ind,
-            self.number_of_patches,
-            update_p,
-            self.d,
-            ptr_clause_active,
-            ptr_xi,
-            target
+            ptr_cp,
+            ptr_clause_outputs
         )
 
         self.incremental_clause_evaluation_initialized = False

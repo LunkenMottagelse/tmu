@@ -87,6 +87,8 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         # Override update method for specific platforms
         if self.platform == "FPGA":
             self.update = self._update_fpga
+            self.fit = self._fit_fpga
+            self.predict = self._predict_fpga
 
     def init_weight_bank(self, X: np.ndarray, Y: np.ndarray):
         self.number_of_classes = int(np.max(Y) + 1)
@@ -101,9 +103,117 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
 
         if self.max_positive_clauses is None:
             self.max_positive_clauses = self.number_of_clauses
-    
-    def _update_fpga(self, target, e, encoded_X_train):
-        clause_outputs, clause_sums, clause_patches = self.clause_bank.calculate_clause_outputs_update_fpga(self.literal_active, encoded_X_train, e)
+
+    def _update_fpga(self, target, e, X_train):
+        clause_outputs, class_sums, clause_patches = self.clause_bank.calculate_clause_outputs_update_fpga(X_train, e)
+
+        class_sums = np.clip(class_sums, -self.T, self.T)
+        update_p = (self.T - class_sums) / (2 * self.T)
+
+        # type_iii_feedback_selection = self.rng.choice(2)
+
+        self.clause_bank.type_i_feedback(
+            update_p=update_p * self.type_i_p,
+            clause_active=self.clause_active * (self.weight_banks[target].get_weights() >= 0),
+            clause_patches=clause_patches,
+            clause_outputs=clause_outputs
+        )
+
+        self.clause_bank.type_ii_feedback(
+            update_p=update_p * self.type_ii_p,
+            clause_active=self.clause_active * (self.weight_banks[target].get_weights() < 0),
+            clause_patches=clause_patches,
+            clause_outputs=clause_outputs
+        )
+
+        if (self.weight_banks[target].get_weights() >= 0).sum() < self.max_positive_clauses:
+            self.weight_banks[target].increment(
+                clause_output=clause_outputs,
+                update_p=update_p,
+                clause_active=self.clause_active,
+                positive_weights=True
+            )
+
+        # if self.type_iii_feedback and type_iii_feedback_selection == 0:
+        #     self.clause_bank.type_iii_feedback(
+        #         update_p=update_p,
+        #         clause_active=self.clause_active * (self.weight_banks[target].get_weights() >= 0),
+        #         literal_active=self.literal_active,
+        #         encoded_X=encoded_X_train,
+        #         e=e,
+        #         target=1
+        #     )
+
+        #     self.clause_bank.type_iii_feedback(
+        #         update_p=update_p,
+        #         clause_active=self.clause_active * (self.weight_banks[target].get_weights() < 0),
+        #         literal_active=self.literal_active,
+        #         encoded_X=encoded_X_train,
+        #         e=e,
+        #         target=0
+        #     )
+
+        for i in range(self.number_of_classes):
+            if i == target:
+                self.update_ps[i] = 0.0
+            else:
+                self.update_ps[i] = np.dot(self.clause_active * self.weight_banks[i].get_weights(),
+                                           clause_outputs).astype(np.int32)
+                self.update_ps[i] = np.clip(self.update_ps[i], -self.T, self.T)
+                self.update_ps[i] = 1.0 * (self.T + self.update_ps[i]) / (2 * self.T)
+
+        if self.update_ps.sum() == 0:
+            return
+
+        if self.focused_negative_sampling:
+            not_target = self.rng.choice(self.number_of_classes, p=self.update_ps / self.update_ps.sum())
+            update_p = self.update_ps[not_target]
+        else:
+            not_target = self.rng.randint(self.number_of_classes)
+            while not_target == target:
+                not_target = self.rng.randint(self.number_of_classes)
+            update_p = self.update_ps[not_target]
+
+        self.clause_bank.type_i_feedback(
+            update_p=update_p * self.type_i_p,
+            clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() < 0),
+            clause_patches=clause_patches,
+            clause_outputs=clause_outputs
+        )
+
+        self.clause_bank.type_ii_feedback(
+            update_p=update_p * self.type_ii_p,
+            clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() >= 0),
+            clause_patches=clause_patches,
+            clause_outputs=clause_outputs
+        )
+
+        # if self.type_iii_feedback and type_iii_feedback_selection == 1:
+        #     self.clause_bank.type_iii_feedback(
+        #         update_p=update_p,
+        #         clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() < 0),
+        #         literal_active=self.literal_active,
+        #         encoded_X=encoded_X_train,
+        #         e=e,
+        #         target=1
+        #     )
+
+        #     self.clause_bank.type_iii_feedback(
+        #         update_p=update_p,
+        #         clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() >= 0),
+        #         literal_active=self.literal_active,
+        #         encoded_X=encoded_X_train,
+        #         e=e,
+        #         target=0
+        #     )
+
+        self.weight_banks[not_target].decrement(
+            clause_output=clause_outputs,
+            update_p=update_p,
+            clause_active=self.clause_active,
+            negative_weights=True
+        )
+
 
     def update(self, target, e, encoded_X_train):
         clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, e)
@@ -221,6 +331,42 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
             negative_weights=True
         )
 
+    def _fit_fpga(self, X, Y, shuffle=True, **kwargs):
+        self.init(X, Y)
+
+        Ym = np.ascontiguousarray(Y).astype(np.uint32)
+
+        # Drops clauses randomly based on clause drop probability
+        self.clause_active = (self.rng.rand(self.number_of_clauses) >= self.clause_drop_p).astype(np.int32)
+
+        self.update_ps = np.empty(self.number_of_classes)
+
+        shuffled_index = np.arange(X.shape[0])
+        if shuffle:
+            self.rng.shuffle(shuffled_index)
+
+        class_observed = np.zeros(self.number_of_classes, dtype=np.uint32)
+        example_indexes = np.zeros(self.number_of_classes, dtype=np.uint32)
+        example_counter = 0
+        for e in shuffled_index:
+            if self.output_balancing:
+                if class_observed[Ym[e]] == 0:
+                    example_indexes[Ym[e]] = e
+                    class_observed[Ym[e]] = 1
+                    example_counter += 1
+            else:
+                example_indexes[example_counter] = e
+                example_counter += 1
+
+            if example_counter == self.number_of_classes:
+                example_counter = 0
+
+                for i in range(self.number_of_classes):
+                    class_observed[i] = 0
+                    batch_example = example_indexes[i]
+                    self.update(Ym[batch_example], batch_example, X)
+        return
+
     def fit(self, X, Y, shuffle=True, **kwargs):
         self.init(X, Y)
 
@@ -278,6 +424,19 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
                     batch_example = example_indexes[i]
                     self.update(Ym[batch_example], batch_example, encoded_X_train)
         return
+
+    def _predict_fpga(self, X, clip_class_sum=False, return_class_sums: bool = False, **kwargs):
+        class_sums = np.empty((X.shape[0], self.number_of_classes), dtype=np.int32)
+        for e in range(X.shape[0]):
+            _, class_sums[e], _ = self.clause_bank.calculate_clause_outputs_update_fpga(X, e)
+
+        # Find the class with the maximum sum for each sample
+        max_classes = np.argmax(class_sums, axis=1)
+
+        if return_class_sums:
+            return max_classes, class_sums
+        else:
+            return max_classes
 
     def predict(self, X, clip_class_sum=False, return_class_sums: bool = False, **kwargs):
 
