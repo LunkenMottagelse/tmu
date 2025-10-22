@@ -84,6 +84,10 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         clause_bank_type, clause_bank_args = self.build_clause_bank(X=X, Y=Y)
         self.clause_bank = clause_bank_type(**clause_bank_args)
 
+        # Override update method for specific platforms
+        if self.platform == "FPGA":
+            self.update = self._update_fpga
+
     def init_weight_bank(self, X: np.ndarray, Y: np.ndarray):
         self.number_of_classes = int(np.max(Y) + 1)
         self.weight_banks.set_clause_init(WeightBank, dict(
@@ -97,6 +101,9 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
 
         if self.max_positive_clauses is None:
             self.max_positive_clauses = self.number_of_clauses
+    
+    def _update_fpga(self, target, e, encoded_X_train):
+        clause_outputs, clause_sums, clause_patches = self.clause_bank.calculate_clause_outputs_update_fpga(self.literal_active, encoded_X_train, e)
 
     def update(self, target, e, encoded_X_train):
         clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, e)

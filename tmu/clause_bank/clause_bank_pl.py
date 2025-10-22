@@ -263,6 +263,10 @@ class ClauseBankPL(BaseClauseBank):
         flattened_model = np.concatenate(modified_model).astype(np.uint32)
         return flattened_model
 
+    def calculate_clause_outputs_update_fpga(self, literal_active, encoded_X, e):
+        _LOGGER.info(f"Calculating clause outputs update on FPGA for example {e}")
+        return self.calculate_clause_outputs_update(literal_active, encoded_X, e)
+
     def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
         
         # Get weights using callback function
