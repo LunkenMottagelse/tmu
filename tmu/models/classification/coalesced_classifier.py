@@ -111,8 +111,9 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
     def _update_fpga(self, target, e, X_train):
         clause_outputs, class_sums, clause_patches = self.clause_bank.calculate_clause_outputs_update_fpga(X_train, e)
 
-        class_sums = np.clip(class_sums, -self.T, self.T)
-        update_p = (self.T - class_sums) / (2 * self.T)
+        # Extract target class sum for positive feedback
+        class_sum_target = np.clip(class_sums[target], -self.T, self.T)
+        update_p = (self.T - class_sum_target) / (2 * self.T)
 
         # type_iii_feedback_selection = self.rng.choice(2)
 
