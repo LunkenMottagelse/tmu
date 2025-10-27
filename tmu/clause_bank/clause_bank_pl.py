@@ -265,8 +265,8 @@ class ClauseBankPL(BaseClauseBank):
         weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights.flatten())
         self.weight_buffer[:] = weights_packed[::-1]
 
-        model_packed = self.get_model()
-        self.ie_buffer[:] = model_packed
+        self.get_model()
+        self.ie_buffer[:] = self.model
         image_packed = self.pack_image(X_train[e])
         self.image_buffer[:] = image_packed
 
@@ -460,7 +460,7 @@ class ClauseBankPL(BaseClauseBank):
             self.number_of_state_bits_ta,
             self.model_p
         )
-        return model
+        return
 
     def calculate_independent_literal_clause_frequency(self, clause_active):
         ca_p = ffi.cast("unsigned int *", clause_active.ctypes.data)
