@@ -54,6 +54,7 @@ class ClauseBankPL(BaseClauseBank):
         self.model = np.empty(self.number_of_clauses * self.number_of_ta_chunks, dtype=np.uint32, order="c")
         self.transformed_example = np.empty(self.dim[0] * math.ceil(self.dim[1] / 32.0), dtype=np.uint32, order="c")
         
+        self.bits_per_weight = 9  # FIXME: Hardcoded for now, but could be parameterized
         packed_weight_size = math.ceil(self.number_of_classes * self.number_of_clauses / math.floor(32 / self.bits_per_weight))
         self.packed_weights_buffer = np.empty(packed_weight_size, dtype=np.uint32, order="c")
 
@@ -103,7 +104,6 @@ class ClauseBankPL(BaseClauseBank):
         self.weight_ol = self.ol.axi_dma_2
 
         packed_image_size = self.dim[1] * math.ceil(self.dim[2] / 32.0)
-        self.bits_per_weight = 9  # FIXME: Hardcoded for now, but could be parameterized
         packed_clauses_size = math.ceil(self.number_of_clauses / 32.0)
         self.packed_patch_size = math.ceil(self.number_of_literals / 32.0)
         
