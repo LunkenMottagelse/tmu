@@ -242,7 +242,8 @@ class ClauseBankPL(BaseClauseBank):
         weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights.flatten())
         self.weight_buffer[:] = weights_packed[::-1]
 
-        alt_weights_packed = self.get_packed_weights(self.get_weights_callback())
+        # Test C implementation with the same transposed weights
+        alt_weights_packed = self.get_packed_weights(weights)
 
         if not np.array_equal(weights_packed[::-1], alt_weights_packed):
             _LOGGER.warning("Mismatch between custom weight packing and C weight packing!")
