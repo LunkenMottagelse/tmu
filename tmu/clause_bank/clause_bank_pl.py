@@ -53,6 +53,9 @@ class ClauseBankPL(BaseClauseBank):
         self.literal_clause_count = np.empty(self.number_of_literals, dtype=np.uint32, order="c")
         self.model = np.empty(self.number_of_clauses * self.number_of_ta_chunks, dtype=np.uint32, order="c")
         self.transformed_example = np.empty(self.dim[0] * math.ceil(self.dim[1] / 32.0), dtype=np.uint32, order="c")
+        
+        # Will be properly sized after we know bits_per_weight (set later in __init__)
+        self.packed_weights_buffer = None
 
         self.type_ia_feedback_counter = np.zeros(self.number_of_clauses, dtype=np.uint32, order="c")
 
@@ -104,6 +107,8 @@ class ClauseBankPL(BaseClauseBank):
         packed_weight_size = math.ceil(self.number_of_classes * self.number_of_clauses / math.floor(32 / self.bits_per_weight))
         packed_clauses_size = math.ceil(self.number_of_clauses / 32.0)
         self.packed_patch_size = math.ceil(self.number_of_literals / 32.0)
+        
+        self.packed_weights_buffer = np.empty(packed_weight_size, dtype=np.uint32, order="c")
 
         self.image_buffer = allocate(shape=(packed_image_size,), dtype=np.uint32, cacheable=1)
         self.weight_buffer = allocate(shape=(packed_weight_size,), dtype=np.uint32, cacheable=1)
@@ -136,6 +141,7 @@ class ClauseBankPL(BaseClauseBank):
 
         self.model_p = ffi.cast("unsigned int *", self.model.ctypes.data)
         self.transformed_example_p = ffi.cast("unsigned int *", self.transformed_example.ctypes.data)
+        self.packed_weights_p = ffi.cast("unsigned int *", self.packed_weights_buffer.ctypes.data)
 
     def initialize_clauses(self):
         self.clause_bank = np.empty(
@@ -227,34 +233,6 @@ class ClauseBankPL(BaseClauseBank):
                 packed_weights.append(chunk)
         return np.array(packed_weights, dtype=np.uint32)
 
-    # Pack bits into 32-bit ints. assuming bits are in big-endian order (MSB first element)
-    def pack_bits_32(self, bits):
-        # Pad with zeros to make length multiple of 32
-        padded_bits = bits.copy()
-        while len(padded_bits) % 32 != 0:
-            padded_bits.insert(0, 0) # pad from the MSB
-        
-        # Convert to numpy array
-        bit_array = np.array(padded_bits, dtype=np.uint8)
-        
-        # Reshape into groups of 32 bits
-        bit_groups = bit_array.reshape(-1, 32)
-        
-        # Convert each group of 32 bits to a 32-bit integer
-        powers_of_2 = 2 ** np.arange(31, -1, -1)  # [2^31, 2^30, ..., 2^1, 2^0]
-        packed_32bit = np.dot(bit_groups, powers_of_2)
-        
-        return packed_32bit.astype(np.uint32)
-
-    def pack_image(self, image):
-        # Testing image transpose
-        packed_image = np.zeros((image.shape[1], (image.shape[0] + 31) // 32), dtype=np.uint32)
-        # image = np.transpose(image)  # Transpose to match expected layout
-        for i, row in enumerate(image):
-            packed_row = self.pack_bits_32(row[::-1].tolist()) # Invert row for little-endian bit order
-            packed_image[i] = packed_row
-        return np.concatenate(packed_image).astype(np.uint32)
-
     def calculate_clause_outputs_update_fpga(self, X_train, e):
         # Get weights using callback function
         if self.get_weights_callback is None:
@@ -266,6 +244,13 @@ class ClauseBankPL(BaseClauseBank):
 
         weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights.flatten())
         self.weight_buffer[:] = weights_packed[::-1]
+
+        alt_weights_packed = self.get_packed_weights(self.get_weights_callback())
+
+        if not np.array_equal(weights_packed[::-1], alt_weights_packed):
+            _LOGGER.warning("Mismatch between custom weight packing and C weight packing!")
+            _LOGGER.warning(f"Custom packed weights: {weights_packed[::-1]}")
+            _LOGGER.warning(f"C packed weights: {alt_weights_packed}")
 
         self.get_model() # Pointer business
         self.ie_buffer[:] = self.model
@@ -462,6 +447,19 @@ class ClauseBankPL(BaseClauseBank):
             self.model_p
         )
         return
+
+    def get_packed_weights(self, weights):
+        weights_flat = np.ascontiguousarray(weights.flatten(), dtype=np.int32)
+        weights_p = ffi.cast("int *", weights_flat.ctypes.data)
+        
+        lib.cbpl_pack_weights(
+            weights_p,
+            self.packed_weights_p,
+            weights_flat.shape[0],
+            self.bits_per_weight
+        )
+        
+        return self.packed_weights_buffer
 
     def calculate_independent_literal_clause_frequency(self, clause_active):
         ca_p = ffi.cast("unsigned int *", clause_active.ctypes.data)

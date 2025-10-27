@@ -499,6 +499,58 @@ void cbpl_transform_example(
 	}
 }
 
+void cbpl_pack_weights(
+	int *weights,
+	unsigned int *packed_weights,
+	int num_weights,
+	int bits_per_weight
+)
+{
+	// Pack weights into 32-bit chunks and reverse the output
+	// Python logic:
+	// - num_weights_per_chunk = 32 // bits_per_weight (e.g., 32 // 9 = 3)
+	// - For each weight, mask to bits_per_weight bits and shift by position
+	// - Pack from LSB to MSB: weight[i] goes to bits [i*bits_per_weight : (i+1)*bits_per_weight]
+	// - Finally reverse the array (Python does [::-1])
+	
+	int num_weights_per_chunk = 32 / bits_per_weight;
+	unsigned int weight_mask = (1 << bits_per_weight) - 1;  // Mask for bits_per_weight bits
+	
+	unsigned int chunk = 0;
+	int packed_idx = 0;
+	
+	// First pass: pack weights into chunks
+	for (int i = 0; i < num_weights; i++) {
+		// Reset chunk when starting a new one
+		if (i % num_weights_per_chunk == 0) {
+			chunk = 0;
+		}
+		
+		// Get the weight value and mask it to bits_per_weight bits
+		int weight_value = weights[i];
+		unsigned int masked_weight = weight_value & weight_mask;
+		
+		// Calculate bit position within the chunk (LSB is position 0)
+		int bit_position = (i % num_weights_per_chunk) * bits_per_weight;
+		
+		// OR the masked weight into the chunk at the correct position
+		chunk |= masked_weight << bit_position;
+		
+		// Check if chunk is full or if this is the last element
+		if ((i % num_weights_per_chunk == num_weights_per_chunk - 1) || (i == num_weights - 1)) {
+			packed_weights[packed_idx++] = chunk;
+		}
+	}
+	
+	// Second pass: reverse the array in-place
+	int total_chunks = packed_idx;
+	for (int i = 0; i < total_chunks / 2; i++) {
+		unsigned int temp = packed_weights[i];
+		packed_weights[i] = packed_weights[total_chunks - 1 - i];
+		packed_weights[total_chunks - 1 - i] = temp;
+	}
+}
+
 void cbpl_calculate_clause_outputs_update(
         unsigned int *ta_state,
         int number_of_clauses,
