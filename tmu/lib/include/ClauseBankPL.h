@@ -132,6 +132,7 @@ void cbpl_transform_example(
 void cbpl_pack_weights(
 	int *weights,
 	unsigned int *packed_weights,
-	int num_weights,
+	int num_rows,
+    int num_cols,
 	int bits_per_weight
 );

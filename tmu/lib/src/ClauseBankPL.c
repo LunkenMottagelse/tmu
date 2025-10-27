@@ -502,47 +502,51 @@ void cbpl_transform_example(
 void cbpl_pack_weights(
 	int *weights,
 	unsigned int *packed_weights,
-	int num_weights,
+	int num_rows,
+	int num_cols,
 	int bits_per_weight
 )
 {
-	// Pack weights into 32-bit chunks and reverse the output
-	// Python logic:
-	// - num_weights_per_chunk = 32 // bits_per_weight (e.g., 32 // 9 = 3)
-	// - For each weight, mask to bits_per_weight bits and shift by position
-	// - Pack from LSB to MSB: weight[i] goes to bits [i*bits_per_weight : (i+1)*bits_per_weight]
-	// - Finally reverse the array (Python does [::-1])
+	// Pack weights with transpose: input is [num_rows, num_cols], transpose to [num_cols, num_rows]
+	// Then pack and reverse
+	// This avoids creating a transposed copy in Python
 	
 	int num_weights_per_chunk = 32 / bits_per_weight;
-	unsigned int weight_mask = (1 << bits_per_weight) - 1;  // Mask for bits_per_weight bits
+	unsigned int weight_mask = (1 << bits_per_weight) - 1;
 	
 	unsigned int chunk = 0;
 	int packed_idx = 0;
+	int weight_count = 0;
+	int total_weights = num_rows * num_cols;
 	
-	// First pass: pack weights into chunks
-	for (int i = 0; i < num_weights; i++) {
-		// Reset chunk when starting a new one
-		if (i % num_weights_per_chunk == 0) {
-			chunk = 0;
-		}
-		
-		// Get the weight value and mask it to bits_per_weight bits
-		int weight_value = weights[i];
-		unsigned int masked_weight = weight_value & weight_mask;
-		
-		// Calculate bit position within the chunk (LSB is position 0)
-		int bit_position = (i % num_weights_per_chunk) * bits_per_weight;
-		
-		// OR the masked weight into the chunk at the correct position
-		chunk |= masked_weight << bit_position;
-		
-		// Check if chunk is full or if this is the last element
-		if ((i % num_weights_per_chunk == num_weights_per_chunk - 1) || (i == num_weights - 1)) {
-			packed_weights[packed_idx++] = chunk;
+	// Iterate in transposed order: for each column, then each row
+	for (int col = 0; col < num_cols; col++) {
+		for (int row = 0; row < num_rows; row++) {
+			// Reset chunk when starting a new one
+			if (weight_count % num_weights_per_chunk == 0) {
+				chunk = 0;
+			}
+			
+			// Access weight at [row, col] in original array (row-major order)
+			int weight_value = weights[row * num_cols + col];
+			unsigned int masked_weight = weight_value & weight_mask;
+			
+			// Calculate bit position within the chunk
+			int bit_position = (weight_count % num_weights_per_chunk) * bits_per_weight;
+			
+			// OR the masked weight into the chunk
+			chunk |= masked_weight << bit_position;
+			
+			// Check if chunk is full or if this is the last element
+			if ((weight_count % num_weights_per_chunk == num_weights_per_chunk - 1) || (weight_count == total_weights - 1)) {
+				packed_weights[packed_idx++] = chunk;
+			}
+			
+			weight_count++;
 		}
 	}
 	
-	// Second pass: reverse the array in-place
+	// Reverse the array in-place
 	int total_chunks = packed_idx;
 	for (int i = 0; i < total_chunks / 2; i++) {
 		unsigned int temp = packed_weights[i];

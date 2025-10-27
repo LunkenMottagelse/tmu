@@ -237,9 +237,10 @@ class ClauseBankPL(BaseClauseBank):
         
         # Get all weights from all weight banks using the callback
         weights = self.get_weights_callback()
-        weights = np.transpose(weights)  # Flip weights to be [classes, clauses]
-
-        weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights.flatten())
+        
+        # Python version: transpose then pack
+        weights_transposed = np.transpose(weights)  # Flip weights to be [classes, clauses]
+        weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights_transposed.flatten())
         self.weight_buffer[:] = weights_packed[::-1]
 
         # Test C implementation with the same transposed weights
@@ -447,13 +448,25 @@ class ClauseBankPL(BaseClauseBank):
         return
 
     def get_packed_weights(self, weights):
-        weights_flat = np.ascontiguousarray(weights.flatten(), dtype=np.int32)
-        weights_p = ffi.cast("int *", weights_flat.ctypes.data)
+        """
+        Pack weights into 32-bit chunks using C implementation with transpose.
+        
+        Args:
+            weights: numpy array from get_weights_callback(), shape [rows, cols]
+                    Will be transposed to [cols, rows] during packing
+        
+        Returns:
+            packed weights array (already reversed by C code)
+        """
+        # Ensure weights are int32 and contiguous
+        weights_contig = np.ascontiguousarray(weights, dtype=np.int32)
+        weights_p = ffi.cast("int *", weights_contig.ctypes.data)
         
         lib.cbpl_pack_weights(
             weights_p,
             self.packed_weights_p,
-            weights_flat.shape[0],
+            weights_contig.shape[0],  # num_rows
+            weights_contig.shape[1],  # num_cols
             self.bits_per_weight
         )
         
