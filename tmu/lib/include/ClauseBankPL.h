@@ -121,3 +121,10 @@ void cbpl_get_model(
 	unsigned int number_of_state_bits,
 	unsigned int *model
 );
+
+void cbpl_transform_example(
+	unsigned int *X,
+	unsigned int *encoded_X,
+	int dim_y,
+	int dim_x
+);

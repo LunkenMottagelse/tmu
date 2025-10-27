@@ -436,6 +436,69 @@ void cbpl_get_model(
 	}
 }
 
+void cbpl_transform_example(
+	unsigned int *X,
+	unsigned int *encoded_X,
+	int dim_y,
+	int dim_x
+)
+{
+	// X is a 2D image with dimensions dim_x (rows) x dim_y (columns)
+	// Each row needs to be reversed and packed into 32-bit integers
+	// The packed result is stored in encoded_X
+	
+	// Calculate padding needed for each row
+	unsigned int padded_dim_y = dim_y;
+	if (dim_y % 32 != 0) {
+		padded_dim_y = ((dim_y / 32) + 1) * 32;
+	}
+	unsigned int chunks_per_row = padded_dim_y / 32;
+	unsigned int padding = padded_dim_y - dim_y;
+	
+	unsigned int encoded_idx = 0;
+	
+	// Process each row of the image
+	for (int row = 0; row < dim_x; row++) {
+		unsigned int row_offset = row * dim_y;
+		
+		// Pack this row into chunks
+		// Python logic: row[::-1] reverses the row, then pack_bits_32 pads and packs
+		for (unsigned int chunk = 0; chunk < chunks_per_row; chunk++) {
+			unsigned int packed_value = 0;
+			
+			// For each of the 32 bits in this chunk
+			for (int i = 0; i < 32; i++) {
+				// Position in the padded array
+				int padded_pos = chunk * 32 + i;
+				
+				// Check if this is padding or actual data
+				if (padded_pos < padding) {
+					// This is padding, bit = 0 (already initialized)
+					continue;
+				}
+				
+				// Position in the reversed array (after removing padding offset)
+				int reversed_pos = padded_pos - padding;
+				
+				// Original position (before reversal)
+				int original_pos = dim_y - 1 - reversed_pos;
+				
+				// Read the bit from X
+				// X is stored as individual bits (0 or 1) in the array
+				unsigned int bit_value = X[row_offset + original_pos];
+				
+				// Place it at the correct position in packed_value
+				// Bit at position i in the padded array should go to bit (31-i)
+				if (bit_value) {
+					packed_value |= (1 << (31 - i));
+				}
+			}
+			
+			encoded_X[encoded_idx++] = packed_value;
+		}
+	}
+}
+
 void cbpl_calculate_clause_outputs_update(
         unsigned int *ta_state,
         int number_of_clauses,

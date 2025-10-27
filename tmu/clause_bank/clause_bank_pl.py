@@ -52,6 +52,7 @@ class ClauseBankPL(BaseClauseBank):
         self.output_one_patches = np.empty(self.number_of_patches, dtype=np.uint32, order="c")
         self.literal_clause_count = np.empty(self.number_of_literals, dtype=np.uint32, order="c")
         self.model = np.empty(self.number_of_clauses * self.number_of_ta_chunks, dtype=np.uint32, order="c")
+        self.transformed_example = np.empty(self.dim[0] * self.dim[1], dtype=np.uint32, order="c")
 
         self.type_ia_feedback_counter = np.zeros(self.number_of_clauses, dtype=np.uint32, order="c")
 
@@ -134,6 +135,7 @@ class ClauseBankPL(BaseClauseBank):
         self.previous_xi_p = ffi.cast("unsigned int *", self.previous_xi.ctypes.data)
 
         self.model_p = ffi.cast("unsigned int *", self.model.ctypes.data)
+        self.transformed_example_p = ffi.cast("unsigned int *", self.transformed_example.ctypes.data)
 
     def initialize_clauses(self):
         self.clause_bank = np.empty(
@@ -268,6 +270,13 @@ class ClauseBankPL(BaseClauseBank):
         self.get_model()
         self.ie_buffer[:] = self.model
         image_packed = self.pack_image(X_train[e])
+        alt_image_packed = self.transform_example(X_train[e])
+
+        if not np.array_equal(image_packed, alt_image_packed):
+            _LOGGER.warning("Mismatch between packed image and transformed example!")
+            _LOGGER.warning(f"Packed image: {image_packed}")
+            _LOGGER.warning(f"Transformed example: {alt_image_packed}")
+
         self.image_buffer[:] = image_packed
 
         # 1: ship to PL
@@ -485,19 +494,18 @@ class ClauseBankPL(BaseClauseBank):
             self.number_of_state_bits_ta
         )
 
-    def prepare_X(
+    def transform_example(
             self,
             X
     ):
-        return tmu.tools.encode(
-            X,
-            X.shape[0],
-            self.number_of_patches,
-            self.number_of_ta_chunks,
-            self.dim,
-            self.patch_dim,
-            0
+        X_p = ffi.cast("unsigned int *", X.ctypes.data)
+        lib.cbpl_transform_example(
+            X_p,
+            self.transformed_example_p,
+            self.dim[0],
+            self.dim[1]
         )
+        return self.transformed_example
 
     def prepare_X_autoencoder(
             self,
