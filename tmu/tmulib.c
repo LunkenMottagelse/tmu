@@ -2542,6 +2542,74 @@ void cbpl_get_literals(
     }
 }
 
+void cbpl_get_model(
+	const unsigned int *ta_state,
+	unsigned int number_of_clauses,
+	unsigned int number_of_literals,
+	unsigned int number_of_state_bits,
+	unsigned int *model
+)
+{
+	unsigned int number_of_ta_chunks = (number_of_literals-1)/32 + 1;
+	
+	// Calculate number of 32-bit chunks needed per clause (after padding)
+	unsigned int padded_literals = number_of_literals;
+	if (number_of_literals % 32 != 0) {
+		padded_literals = ((number_of_literals / 32) + 1) * 32;
+	}
+	unsigned int chunks_per_clause = padded_literals / 32;
+	unsigned int padding = padded_literals - number_of_literals;
+
+	// Pack each clause's literals into 32-bit integers directly from ta_state
+	unsigned int model_idx = 0;
+	for (unsigned int j = 0; j < number_of_clauses; j++) {
+		unsigned int clause_base = j * number_of_ta_chunks * number_of_state_bits;
+		
+		// Python logic:
+		// 1. row = [lit0, lit1, ..., lit(n-1)]
+		// 2. reversed = [lit(n-1), lit(n-2), ..., lit0]
+		// 3. padded = [0, 0, ..., lit(n-1), lit(n-1), ..., lit0]  (padding zeros at start)
+		// 4. Pack in groups of 32 with MSB = first element
+		
+		for (unsigned int chunk = 0; chunk < chunks_per_clause; chunk++) {
+			unsigned int packed_value = 0;
+			
+			// For each of the 32 bits in this chunk
+			for (int i = 0; i < 32; i++) {
+				// Position in the padded array
+				int padded_pos = chunk * 32 + i;
+				
+				// Check if this is padding or actual data
+				if (padded_pos < padding) {
+					// This is padding, bit = 0 (already initialized)
+					continue;
+				}
+				
+				// Position in the reversed array (after removing padding offset)
+				int reversed_pos = padded_pos - padding;
+				
+				// Original position (before reversal)
+				int original_pos = number_of_literals - 1 - reversed_pos;
+				
+				// Determine which ta_chunk and bit position
+				unsigned int ta_chunk = original_pos / 32;
+				unsigned int chunk_pos = original_pos % 32;
+				
+				// Read directly from ta_state
+				unsigned int ta_pos = clause_base + ta_chunk * number_of_state_bits + number_of_state_bits - 1;
+				
+				// Extract the bit
+				// Bit at position i in the padded array should go to bit (31-i) in packed_value
+				// because powers_of_2 = [2^31, 2^30, ..., 2^0]
+				if (ta_state[ta_pos] & (1 << chunk_pos)) {
+					packed_value |= (1 << (31 - i));
+				}
+			}
+			
+			model[model_idx++] = packed_value;
+		}
+	}
+}
 
 void cbpl_calculate_clause_outputs_update(
         unsigned int *ta_state,
@@ -4918,6 +4986,75 @@ _cffi_f_cbpl_get_literals(PyObject *self, PyObject *args)
 #  define _cffi_f_cbpl_get_literals _cffi_d_cbpl_get_literals
 #endif
 
+static void _cffi_d_cbpl_get_model(unsigned int const * x0, unsigned int x1, unsigned int x2, unsigned int x3, unsigned int * x4)
+{
+  cbpl_get_model(x0, x1, x2, x3, x4);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cbpl_get_model(PyObject *self, PyObject *args)
+{
+  unsigned int const * x0;
+  unsigned int x1;
+  unsigned int x2;
+  unsigned int x3;
+  unsigned int * x4;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+  PyObject *arg3;
+  PyObject *arg4;
+
+  if (!PyArg_UnpackTuple(args, "cbpl_get_model", 5, 5, &arg0, &arg1, &arg2, &arg3, &arg4))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(253), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (unsigned int const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(253), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x1 = _cffi_to_c_int(arg1, unsigned int);
+  if (x1 == (unsigned int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x2 = _cffi_to_c_int(arg2, unsigned int);
+  if (x2 == (unsigned int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x3 = _cffi_to_c_int(arg3, unsigned int);
+  if (x3 == (unsigned int)-1 && PyErr_Occurred())
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(1), arg4, (char **)&x4);
+  if (datasize != 0) {
+    x4 = ((size_t)datasize) <= 640 ? (unsigned int *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(1), arg4, (char **)&x4,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { cbpl_get_model(x0, x1, x2, x3, x4); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+#else
+#  define _cffi_f_cbpl_get_model _cffi_d_cbpl_get_model
+#endif
+
 static void _cffi_d_cbpl_included_literals(unsigned int * x0, int x1, int x2, int x3, unsigned int * x4)
 {
   cbpl_included_literals(x0, x1, x2, x3, x4);
@@ -6709,6 +6846,7 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "cbpl_calculate_clause_outputs_update", (void *)_cffi_f_cbpl_calculate_clause_outputs_update, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 77), (void *)_cffi_d_cbpl_calculate_clause_outputs_update },
   { "cbpl_calculate_literal_frequency", (void *)_cffi_f_cbpl_calculate_literal_frequency, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 103), (void *)_cffi_d_cbpl_calculate_literal_frequency },
   { "cbpl_get_literals", (void *)_cffi_f_cbpl_get_literals, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 252), (void *)_cffi_d_cbpl_get_literals },
+  { "cbpl_get_model", (void *)_cffi_f_cbpl_get_model, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 252), (void *)_cffi_d_cbpl_get_model },
   { "cbpl_included_literals", (void *)_cffi_f_cbpl_included_literals, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 96), (void *)_cffi_d_cbpl_included_literals },
   { "cbpl_initialize_incremental_clause_calculation", (void *)_cffi_f_cbpl_initialize_incremental_clause_calculation, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 242), (void *)_cffi_d_cbpl_initialize_incremental_clause_calculation },
   { "cbpl_number_of_include_actions", (void *)_cffi_f_cbpl_number_of_include_actions, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 0), (void *)_cffi_d_cbpl_number_of_include_actions },
@@ -6738,7 +6876,7 @@ static const struct _cffi_type_context_s _cffi_type_context = {
   NULL,  /* no struct_unions */
   NULL,  /* no enums */
   NULL,  /* no typenames */
-  39,  /* num_globals */
+  40,  /* num_globals */
   0,  /* num_struct_unions */
   0,  /* num_enums */
   0,  /* num_typenames */

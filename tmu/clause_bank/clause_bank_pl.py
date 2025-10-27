@@ -51,7 +51,7 @@ class ClauseBankPL(BaseClauseBank):
         self.feedback_to_ta = np.empty(self.number_of_ta_chunks, dtype=np.uint32, order="c")
         self.output_one_patches = np.empty(self.number_of_patches, dtype=np.uint32, order="c")
         self.literal_clause_count = np.empty(self.number_of_literals, dtype=np.uint32, order="c")
-
+        self.model = np.empty(self.number_of_clauses * self.number_of_ta_chunks, dtype=np.uint32, order="c")
 
         self.type_ia_feedback_counter = np.zeros(self.number_of_clauses, dtype=np.uint32, order="c")
 
@@ -132,6 +132,8 @@ class ClauseBankPL(BaseClauseBank):
         self.lcmp_p = ffi.cast("unsigned int *", self.literal_clause_map_pos.ctypes.data)
         self.flpc_p = ffi.cast("unsigned int *", self.false_literals_per_clause.ctypes.data)
         self.previous_xi_p = ffi.cast("unsigned int *", self.previous_xi.ctypes.data)
+
+        self.model_p = ffi.cast("unsigned int *", self.model.ctypes.data)
 
     def initialize_clauses(self):
         self.clause_bank = np.empty(
@@ -250,18 +252,6 @@ class ClauseBankPL(BaseClauseBank):
             packed_row = self.pack_bits_32(row[::-1].tolist()) # Invert row for little-endian bit order
             packed_image[i] = packed_row
         return np.concatenate(packed_image).astype(np.uint32)
-    
-    def pack_model(self):
-        literals = self.get_literals()
-        modified_model = []
-        for row in literals:
-            packed_row = self.pack_bits_32(row[::-1].tolist())
-            modified_model.append(packed_row)
-
-        modified_model = np.array(modified_model, dtype=object)
-
-        flattened_model = np.concatenate(modified_model).astype(np.uint32)
-        return flattened_model
 
     def calculate_clause_outputs_update_fpga(self, X_train, e):
         # Get weights using callback function
@@ -275,7 +265,7 @@ class ClauseBankPL(BaseClauseBank):
         weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights.flatten())
         self.weight_buffer[:] = weights_packed[::-1]
 
-        model_packed = self.pack_model()
+        model_packed = self.get_model()
         self.ie_buffer[:] = model_packed
         image_packed = self.pack_image(X_train[e])
         self.image_buffer[:] = image_packed
@@ -461,6 +451,16 @@ class ClauseBankPL(BaseClauseBank):
             result_p
         )
         return result
+    
+    def get_model(self, independent=False):
+        lib.cbpl_get_model(
+            self.ptr_ta_state_ind if independent else self.ptr_ta_state,
+            self.number_of_clauses,
+            self.number_of_literals,
+            self.number_of_state_bits_ta,
+            self.model_p
+        )
+        return model
 
     def calculate_independent_literal_clause_frequency(self, clause_active):
         ca_p = ffi.cast("unsigned int *", clause_active.ctypes.data)

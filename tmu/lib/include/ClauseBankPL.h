@@ -113,3 +113,11 @@ void cbpl_get_literals(
     unsigned int number_of_state_bits,
     unsigned int *result
 );
+
+void cbpl_get_model(
+	const unsigned int *ta_state,
+	unsigned int number_of_clauses,
+	unsigned int number_of_literals,
+	unsigned int number_of_state_bits,
+	unsigned int *model
+);

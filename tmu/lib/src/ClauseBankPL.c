@@ -380,6 +380,61 @@ void cbpl_get_literals(
     }
 }
 
+void cbpl_get_model(
+	const unsigned int *ta_state,
+	unsigned int number_of_clauses,
+	unsigned int number_of_literals,
+	unsigned int number_of_state_bits,
+	unsigned int *model
+)
+{
+	unsigned int number_of_ta_chunks = (number_of_literals-1)/32 + 1;
+	
+	// Calculate number of 32-bit chunks needed per clause (after padding)
+	unsigned int padded_literals = number_of_literals;
+	if (number_of_literals % 32 != 0) {
+		padded_literals = ((number_of_literals / 32) + 1) * 32;
+	}
+	unsigned int chunks_per_clause = padded_literals / 32;
+	unsigned int padding = padded_literals - number_of_literals;
+
+	// Pack each clause's literals into 32-bit integers directly from ta_state
+	unsigned int model_idx = 0;
+	for (unsigned int j = 0; j < number_of_clauses; j++) {
+		unsigned int clause_base = j * number_of_ta_chunks * number_of_state_bits;		
+		for (unsigned int chunk = 0; chunk < chunks_per_clause; chunk++) {
+			unsigned int packed_value = 0;
+			
+			// For each of the 32 bits in this chunk
+			for (int i = 0; i < 32; i++) {
+				// Position in the padded array
+				int padded_pos = chunk * 32 + i;
+				
+				// Check if this is padding or actual data
+				if (padded_pos < padding) {
+					// This is padding, bit = 0 (already initialized)
+					continue;
+				}
+				
+				int reversed_pos = padded_pos - padding;
+				
+				int original_pos = number_of_literals - 1 - reversed_pos;
+				
+				unsigned int ta_chunk = original_pos / 32;
+				unsigned int chunk_pos = original_pos % 32;
+				
+				// Read directly from ta_state
+				unsigned int ta_pos = clause_base + ta_chunk * number_of_state_bits + number_of_state_bits - 1;
+
+				if (ta_state[ta_pos] & (1 << chunk_pos)) {
+					packed_value |= (1 << (31 - i));
+				}
+			}
+			
+			model[model_idx++] = packed_value;
+		}
+	}
+}
 
 void cbpl_calculate_clause_outputs_update(
         unsigned int *ta_state,
