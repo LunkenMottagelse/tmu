@@ -257,23 +257,8 @@ class ClauseBankPL(BaseClauseBank):
         # NOTE: these are stored densely
         clause_output_pl = self.decision_buffer[self.number_of_classes:self.number_of_classes + math.ceil(self.number_of_clauses / 32)] # Then N transfers contain clause outputs
         
-        # Original Python loop method
-        clause_output_python = np.zeros(self.number_of_clauses, dtype=np.uint32)
-        for i in range(self.number_of_clauses):
-            if clause_output_pl[(i // 32)] >> (i % 32) & 1:
-                clause_output_python[i] = 1
-        
         # Vectorized unpacking of clause outputs
         self.clause_output[:] = (clause_output_pl[self.clause_chunk_idx] >> self.clause_bit_idx) & 1
-        
-        # Verify both methods produce identical results
-        if not np.array_equal(clause_output_python, self.clause_output):
-            _LOGGER.error("MISMATCH: Python loop and vectorized unpacking produce different results!")
-            _LOGGER.error(f"Python result: {clause_output_python}")
-            _LOGGER.error(f"Vectorized result: {self.clause_output}")
-            raise RuntimeError("Clause output unpacking mismatch!")
-        else:
-            _LOGGER.info("✓ Clause output unpacking methods match")
         
         patches = self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):]  # Then remaining transfers contain selected patches
         patches = patches.reshape((self.number_of_clauses, self.packed_patch_size))
