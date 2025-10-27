@@ -54,8 +54,8 @@ class ClauseBankPL(BaseClauseBank):
         self.model = np.empty(self.number_of_clauses * self.number_of_ta_chunks, dtype=np.uint32, order="c")
         self.transformed_example = np.empty(self.dim[0] * math.ceil(self.dim[1] / 32.0), dtype=np.uint32, order="c")
         
-        # Will be properly sized after we know bits_per_weight (set later in __init__)
-        self.packed_weights_buffer = None
+        packed_weight_size = math.ceil(self.number_of_classes * self.number_of_clauses / math.floor(32 / self.bits_per_weight))
+        self.packed_weights_buffer = np.empty(packed_weight_size, dtype=np.uint32, order="c")
 
         self.type_ia_feedback_counter = np.zeros(self.number_of_clauses, dtype=np.uint32, order="c")
 
@@ -104,12 +104,9 @@ class ClauseBankPL(BaseClauseBank):
 
         packed_image_size = self.dim[1] * math.ceil(self.dim[2] / 32.0)
         self.bits_per_weight = 9  # FIXME: Hardcoded for now, but could be parameterized
-        packed_weight_size = math.ceil(self.number_of_classes * self.number_of_clauses / math.floor(32 / self.bits_per_weight))
         packed_clauses_size = math.ceil(self.number_of_clauses / 32.0)
         self.packed_patch_size = math.ceil(self.number_of_literals / 32.0)
         
-        self.packed_weights_buffer = np.empty(packed_weight_size, dtype=np.uint32, order="c")
-
         self.image_buffer = allocate(shape=(packed_image_size,), dtype=np.uint32, cacheable=1)
         self.weight_buffer = allocate(shape=(packed_weight_size,), dtype=np.uint32, cacheable=1)
         self.ie_buffer = allocate(shape=(self.number_of_clauses * self.number_of_ta_chunks,), dtype=np.uint32, cacheable=1)
