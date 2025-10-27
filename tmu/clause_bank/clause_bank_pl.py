@@ -267,17 +267,9 @@ class ClauseBankPL(BaseClauseBank):
         weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights.flatten())
         self.weight_buffer[:] = weights_packed[::-1]
 
-        self.get_model()
+        self.get_model() # Pointer business
         self.ie_buffer[:] = self.model
-        image_packed = self.pack_image(X_train[e])
-        alt_image_packed = self.transform_example(X_train[e])
-
-        if not np.array_equal(image_packed, alt_image_packed):
-            _LOGGER.warning("Mismatch between packed image and transformed example!")
-            _LOGGER.warning(f"Packed image: {image_packed}")
-            _LOGGER.warning(f"Transformed example: {alt_image_packed}")
-
-        self.image_buffer[:] = image_packed
+        self.image_buffer[:] = self.transform_example(X_train[e])
 
         # 1: ship to PL
         pl_timer = tmu.tools.BenchmarkTimer()
