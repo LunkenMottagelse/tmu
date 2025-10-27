@@ -3,8 +3,43 @@ import argparse
 from tmu.data import MNIST
 from tmu.models.classification.coalesced_classifier import TMCoalescedClassifier
 from tmu.tools import BenchmarkTimer
+import cProfile
+import pstats
+import io
+from functools import wraps
 
 _LOGGER = logging.getLogger(__name__)
+
+def profile(func=None, output_file='convcotm.prof'):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            # Create and start profiler
+            pr = cProfile.Profile()
+            pr.enable()
+
+            # Call the original function
+            result = f(*args, **kwargs)
+
+            # Stop profiling
+            pr.disable()
+
+            # Print formatted results to console
+            s = io.StringIO()
+            ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+            ps.print_stats(20)
+            print(s.getvalue())
+
+            # Save to file if requested
+            if output_file:
+                ps.dump_stats(output_file)
+                print(f"Profile data saved to {output_file}")
+
+            return result
+        return wrapper
+    return decorator(func)
+
+
 
 def metrics(args):
     return dict(
@@ -16,6 +51,7 @@ def metrics(args):
         args=vars(args)
     )
 
+@profile
 def main(args):
     experiment_results = metrics(args)
 
