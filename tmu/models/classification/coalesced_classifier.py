@@ -84,15 +84,15 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
 
         self.max_positive_clauses = max_positive_clauses
 
-    def init_clause_bank(self, X: np.ndarray, Y: np.ndarray):
-        clause_bank_type, clause_bank_args = self.build_clause_bank(X=X, Y=Y)
-        self.clause_bank = clause_bank_type(**clause_bank_args)
-
-        # Override update method for specific platforms
+        # Override methods for specific platforms BEFORE any usage
         if self.platform == "FPGA":
             self.update = self._update_fpga
             self.fit = self._fit_fpga
             self.predict = self._predict_fpga
+
+    def init_clause_bank(self, X: np.ndarray, Y: np.ndarray):
+        clause_bank_type, clause_bank_args = self.build_clause_bank(X=X, Y=Y)
+        self.clause_bank = clause_bank_type(**clause_bank_args)
 
     def init_weight_bank(self, X: np.ndarray, Y: np.ndarray):
         self.number_of_classes = int(np.max(Y) + 1)
