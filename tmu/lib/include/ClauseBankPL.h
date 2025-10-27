@@ -128,3 +128,10 @@ void cbpl_transform_example(
 	int dim_y,
 	int dim_x
 );
+
+void cbpl_pack_weights(
+	int *weights,
+	unsigned int *packed_weights,
+	int num_weights,
+	int bits_per_weight
+);
