@@ -60,6 +60,11 @@ class ClauseBankPL(BaseClauseBank):
 
         self.type_ia_feedback_counter = np.zeros(self.number_of_clauses, dtype=np.uint32, order="c")
 
+        # Pre-compute indices for vectorized clause output unpacking
+        clause_indices = np.arange(self.number_of_clauses, dtype=np.uint32)
+        self.clause_chunk_idx = clause_indices // 32
+        self.clause_bit_idx = clause_indices % 32
+
         # Incremental Clause Evaluation
         self.literal_clause_map = np.empty(
             (int(self.number_of_literals * self.number_of_clauses)),
@@ -228,20 +233,17 @@ class ClauseBankPL(BaseClauseBank):
         self.ie_buffer[:] = self.model
         self.image_buffer[:] = self.transform_example(X_train[e])
 
-        # 1: ship to PL
-        pl_timer = tmu.tools.BenchmarkTimer()
-        with pl_timer:
-            self.ie_ol.sendchannel.transfer(self.ie_buffer)
-            self.weight_ol.sendchannel.transfer(self.weight_buffer)
-            self.img_decision_ol.sendchannel.transfer(self.image_buffer)
-            self.img_decision_ol.recvchannel.transfer(self.decision_buffer)
+        self.ie_ol.sendchannel.transfer(self.ie_buffer)
+        self.weight_ol.sendchannel.transfer(self.weight_buffer)
+        self.img_decision_ol.sendchannel.transfer(self.image_buffer)
+        self.img_decision_ol.recvchannel.transfer(self.decision_buffer)
 
-            # 2: capture output
+        # 2: capture output
 
-            self.img_decision_ol.sendchannel.wait()
-            self.ie_ol.sendchannel.wait()
-            self.weight_ol.sendchannel.wait()
-            self.img_decision_ol.recvchannel.wait()
+        self.img_decision_ol.sendchannel.wait()
+        self.ie_ol.sendchannel.wait()
+        self.weight_ol.sendchannel.wait()
+        self.img_decision_ol.recvchannel.wait()
 
         # 3: store output in correct location.
         # class sums -> First NClasses transfers contain class sums
@@ -254,51 +256,27 @@ class ClauseBankPL(BaseClauseBank):
         
         # NOTE: these are stored densely
         clause_output_pl = self.decision_buffer[self.number_of_classes:self.number_of_classes + math.ceil(self.number_of_clauses / 32)] # Then N transfers contain clause outputs
+        
+        # Original Python loop method
+        clause_output_python = np.zeros(self.number_of_clauses, dtype=np.uint32)
         for i in range(self.number_of_clauses):
             if clause_output_pl[(i // 32)] >> (i % 32) & 1:
-                self.clause_output[i] = 1
-        patches = np.array(self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):])  # Then remaining transfers contain selected patches
-        patches = patches.reshape((self.number_of_clauses, self.packed_patch_size))
-        # _LOGGER.info("Clause output from PL v")
-        # _LOGGER.info(self.clause_output)
-
-        # Then flush
-        # self.ie_buffer.flush()
-        # self.weight_buffer.flush()
-        # self.image_buffer.flush()
-        # self.decision_buffer.flush()
-        # _LOGGER.info(self.clause_output)
-        # _LOGGER.info("Clause output from classic ^")
+                clause_output_python[i] = 1
         
-        # _LOGGER.info(f"PL time: {pl_timer.elapsed():.2f} s, Classic time: {classic_timer.elapsed():.2f} s")
-
-        # if not np.array_equal(self.clause_output, expanded_clause_output):
-        #     _LOGGER.warning("="*60)
-        #     _LOGGER.warning(f"Mismatch between PL and classic TM clause outputs in example {e}!")
-        #     _LOGGER.warning(f"PL output: {expanded_clause_output}")
-        #     _LOGGER.warning(f"Classic output: {self.clause_output}")
-
-        #     # Find the clauses that differ
-        #     for i in range(self.number_of_clauses):
-        #         if self.clause_output[i] != expanded_clause_output[i]:
-        #             _LOGGER.warning(f"Clause {i} differs: PL={expanded_clause_output[i]}, Classic={self.clause_output[i]}")
-        #             # Log the content of the clause
-        #             literals = self.get_literals()[i]
-        #             _LOGGER.warning(f"Literals for clause {i}: {literals}")
-        #     _LOGGER.warning("-"*60)
-        #     _LOGGER.warning("Packed Model:")
-        #     _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(model_packed))
-        #     _LOGGER.warning("-"*60)
-        #     _LOGGER.warning("Packed Image:")
-        #     _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(image_packed))
-        #     _LOGGER.warning("-"*60)
-        #     _LOGGER.warning("Packed Weights:")
-        #     _LOGGER.warning(np.vectorize(lambda x: f"0x{x:08x}")(weights_packed))
-        #     _LOGGER.warning("="*60)
-        # else:
-        #     _LOGGER.info(f"PL and classic TM clause outputs match for example {e}.")
-
-
+        # Vectorized unpacking of clause outputs
+        self.clause_output[:] = (clause_output_pl[self.clause_chunk_idx] >> self.clause_bit_idx) & 1
+        
+        # Verify both methods produce identical results
+        if not np.array_equal(clause_output_python, self.clause_output):
+            _LOGGER.error("MISMATCH: Python loop and vectorized unpacking produce different results!")
+            _LOGGER.error(f"Python result: {clause_output_python}")
+            _LOGGER.error(f"Vectorized result: {self.clause_output}")
+            raise RuntimeError("Clause output unpacking mismatch!")
+        else:
+            _LOGGER.info("✓ Clause output unpacking methods match")
+        
+        patches = self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):]  # Then remaining transfers contain selected patches
+        patches = patches.reshape((self.number_of_clauses, self.packed_patch_size))
 
         return self.clause_output, class_sums, patches
 
