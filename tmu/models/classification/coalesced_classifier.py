@@ -22,6 +22,10 @@ from tmu.models.base import MultiWeightBankMixin, SingleClauseBankMixin, TMBaseM
 from tmu.util.encoded_data_cache import DataEncoderCache
 from tmu.weight_bank import WeightBank
 import numpy as np
+import logging
+
+_LOGGER = logging.getLogger(__name__)
+
 
 
 class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankMixin):
@@ -332,6 +336,7 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         )
 
     def _fit_fpga(self, X, Y, shuffle=True, **kwargs):
+        _LOGGER.info("Starting FPGA fit method.")
         self.init(X, Y)
 
         Ym = np.ascontiguousarray(Y).astype(np.uint32)
@@ -348,7 +353,9 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         class_observed = np.zeros(self.number_of_classes, dtype=np.uint32)
         example_indexes = np.zeros(self.number_of_classes, dtype=np.uint32)
         example_counter = 0
-        for e in shuffled_index:
+        for idx, e in enumerate(shuffled_index):
+            if idx % (len(shuffled_index) // 100) == 0:
+                _LOGGER.info(f"FPGA Fit progress: {idx / len(shuffled_index) * 100:.2f}%")
             if self.output_balancing:
                 if class_observed[Ym[e]] == 0:
                     example_indexes[Ym[e]] = e
