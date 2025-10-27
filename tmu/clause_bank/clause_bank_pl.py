@@ -216,40 +216,13 @@ class ClauseBankPL(BaseClauseBank):
 
         return self.clause_output_batch.reshape((self.batch_size, self.number_of_clauses))[e % self.batch_size, :]
 
-    def weight_packing_bits_32(self, bits_per_weight, model):
-        # Pack weights into 32-bit chunks
-        packed_weights = []
-        num_weights_per_chunk = 32 // bits_per_weight
-        for i in range(0, model.shape[0]):
-            if i % num_weights_per_chunk == 0:
-                chunk = 0
-            chunk |= (model[i] & ((1 << bits_per_weight) - 1)) << (i % num_weights_per_chunk * bits_per_weight)
-            
-            #  [--------------------Chunk is full-------------------------]    [-----Last element------]
-            if ((i % num_weights_per_chunk) == (num_weights_per_chunk) - 1) or (i == model.shape[0] - 1):
-                packed_weights.append(chunk)
-        return np.array(packed_weights, dtype=np.uint32)
-
     def calculate_clause_outputs_update_fpga(self, X_train, e):
         # Get weights using callback function
         if self.get_weights_callback is None:
             raise RuntimeError("get_weights_callback is not set. Please provide a callback function when creating ClauseBankPL.")
         
-        # Get all weights from all weight banks using the callback
-        weights = self.get_weights_callback()
-        
-        # Python version: transpose then pack
-        weights_transposed = np.transpose(weights)  # Flip weights to be [classes, clauses]
-        weights_packed = self.weight_packing_bits_32(self.bits_per_weight, weights_transposed.flatten())
-        self.weight_buffer[:] = weights_packed[::-1]
-
-        # Test C implementation with the same transposed weights
-        alt_weights_packed = self.get_packed_weights(weights)
-
-        if not np.array_equal(weights_packed[::-1], alt_weights_packed):
-            _LOGGER.warning("Mismatch between custom weight packing and C weight packing!")
-            _LOGGER.warning(f"Custom packed weights: {weights_packed[::-1]}")
-            _LOGGER.warning(f"C packed weights: {alt_weights_packed}")
+        weights = self.get_weights_callback()        
+        self.weight_buffer[:] = self.get_packed_weights(weights)
 
         self.get_model() # Pointer business
         self.ie_buffer[:] = self.model
