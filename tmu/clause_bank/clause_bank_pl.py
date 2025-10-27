@@ -52,7 +52,8 @@ class ClauseBankPL(BaseClauseBank):
         self.output_one_patches = np.empty(self.number_of_patches, dtype=np.uint32, order="c")
         self.literal_clause_count = np.empty(self.number_of_literals, dtype=np.uint32, order="c")
         self.model = np.empty(self.number_of_clauses * self.number_of_ta_chunks, dtype=np.uint32, order="c")
-        self.transformed_example = np.empty(self.dim[0] * self.dim[1], dtype=np.uint32, order="c")
+        # Transformed example should hold packed image: dim[0] rows * ceil(dim[1]/32) chunks per row
+        self.transformed_example = np.empty(self.dim[0] * math.ceil(self.dim[1] / 32.0), dtype=np.uint32, order="c")
 
         self.type_ia_feedback_counter = np.zeros(self.number_of_clauses, dtype=np.uint32, order="c")
 
