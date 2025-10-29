@@ -5,6 +5,8 @@ from tmu.models.classification.coalesced_classifier import TMCoalescedClassifier
 from tmu.tools import BenchmarkTimer
 
 _LOGGER = logging.getLogger(__name__)
+logging.basicConfig(filename='coalesced_classifier.log', encoding='utf-8', level=logging.DEBUG)
+
 
 def metrics(args):
     return dict(

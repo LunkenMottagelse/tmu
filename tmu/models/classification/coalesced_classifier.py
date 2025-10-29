@@ -29,7 +29,6 @@ import io
 from functools import wraps
 
 _LOGGER = logging.getLogger(__name__)
-logging.basicConfig(filename='coalesced_classifier.log', encoding='utf-8', level=logging.DEBUG)
 
 def profile(func=None, output_file='convcotm.prof'):
     def decorator(f):
