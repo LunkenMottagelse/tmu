@@ -246,7 +246,9 @@ class ClauseBankPL(BaseClauseBank):
         # clause_output -> Then N transfers contain clause outputs
         # selected_patches -> Then remaining transfers contain selected patches
         class_sums = self.decision_buffer[:self.number_of_classes]  # First NClasses transfers contain class sums
-        
+        # Cast to int32
+        class_sums = class_sums.astype(np.int32)
+
         # _LOGGER.info("Class sums from PL v")
         # _LOGGER.info(class_sums)
         
