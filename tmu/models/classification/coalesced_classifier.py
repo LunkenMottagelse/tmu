@@ -388,7 +388,7 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         example_counter = 0
         for idx, e in enumerate(shuffled_index):
             if idx % (len(shuffled_index) // 100) == 0:
-                _LOGGER.info(f"FPGA Fit progress: {idx / len(shuffled_index) * 100:.2f}%")
+                _LOGGER.info(f"FPGA Fit progress: {idx / len(shuffled_index) * 100:.1f}%")
             if self.output_balancing:
                 if class_observed[Ym[e]] == 0:
                     example_indexes[Ym[e]] = e

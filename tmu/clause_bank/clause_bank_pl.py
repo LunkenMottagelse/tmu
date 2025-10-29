@@ -239,10 +239,6 @@ class ClauseBankPL(BaseClauseBank):
         self.img_decision_ol.recvchannel.transfer(self.decision_buffer)
 
         # 2: capture output
-
-        self.img_decision_ol.sendchannel.wait()
-        self.ie_ol.sendchannel.wait()
-        self.weight_ol.sendchannel.wait()
         self.img_decision_ol.recvchannel.wait()
 
         # 3: store output in correct location.
