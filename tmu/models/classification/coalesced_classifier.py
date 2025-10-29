@@ -29,6 +29,7 @@ import io
 from functools import wraps
 
 _LOGGER = logging.getLogger(__name__)
+logging.basicConfig(filename='coalesced_classifier.log', encoding='utf-8', level=logging.DEBUG)
 
 def profile(func=None, output_file='convcotm.prof'):
     def decorator(f):
@@ -142,12 +143,18 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
     def _update_fpga(self, target, e, X_train):
         clause_outputs, class_sums, clause_patches = self.clause_bank.calculate_clause_outputs_update_fpga(X_train, e)
 
+        _LOGGER.debug(f"Class sums: {class_sums}")
+        _LOGGER.debug(f"Clause outputs: {clause_outputs}")
+        _LOGGER.debug(f"Clause patches: {clause_patches}")
         # Extract target class sum for positive feedback
         class_sum_target = np.clip(class_sums[target], -self.T, self.T)
+        _LOGGER.debug(f"Target class sum: {class_sum_target}")
         update_p = (self.T - class_sum_target) / (2 * self.T)
+        _LOGGER.debug(f"Update probability: {update_p}")
 
         # type_iii_feedback_selection = self.rng.choice(2)
-
+        _LOGGER.debug(f"Clause weights before update: {self.weight_banks[target].get_weights()}")
+        _LOGGER.debug(f"Clause active: {self.clause_active}")
         self.clause_bank.type_i_feedback(
             update_p=update_p * self.type_i_p,
             clause_active=self.clause_active * (self.weight_banks[target].get_weights() >= 0),
@@ -163,6 +170,7 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         )
 
         if (self.weight_banks[target].get_weights() >= 0).sum() < self.max_positive_clauses:
+            _LOGGER.debug(f"Incrementing weights for target class {target}")
             self.weight_banks[target].increment(
                 clause_output=clause_outputs,
                 update_p=update_p,
@@ -197,6 +205,7 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
                                            clause_outputs).astype(np.int32)
                 self.update_ps[i] = np.clip(self.update_ps[i], -self.T, self.T)
                 self.update_ps[i] = 1.0 * (self.T + self.update_ps[i]) / (2 * self.T)
+        _LOGGER.debug(f"Update probabilities for non-target classes: {self.update_ps}")
 
         if self.update_ps.sum() == 0:
             return
@@ -367,7 +376,6 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
             negative_weights=True
         )
 
-    @profile
     def _fit_fpga(self, X, Y, shuffle=True, **kwargs):
         _LOGGER.info("Starting FPGA fit method.")
         self.init(X, Y)
