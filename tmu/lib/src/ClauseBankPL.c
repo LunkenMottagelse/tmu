@@ -225,9 +225,9 @@ void cbpl_type_i_feedback(
 	if (reuse_random_feedback && s > 1.0) {
 		cbpl_initialize_random_streams(feedback_to_ta, number_of_literals, number_of_ta_chunks, s);
 	}
-	for (int i = 0; i < number_of_clauses / 32; ++i) {
-		printf("Clause outputs chunk %d: 0x%08x\n", i, clause_outputs[i]);
-	}
+	// for (int i = 0; i < number_of_clauses / 32; ++i) {
+	// 	printf("Clause outputs chunk %d: 0x%08x\n", i, clause_outputs[i]);
+	// }
 
 	for (int j = 0; j < number_of_clauses; ++j) {
 		if ((((float)fast_rand())/((float)FAST_RAND_MAX) > update_p) || (!clause_active[j])) {
@@ -236,8 +236,8 @@ void cbpl_type_i_feedback(
 		
 		unsigned int clause_pos = j*number_of_ta_chunks*number_of_state_bits;
 		
-		unsigned int clause_output = clause_outputs[j / 32] & (1 << (j % 32)) ? 1 : 0;
-		printf("Clause %d output: %d\n", j, clause_output);
+		unsigned int clause_output = clause_outputs[j];
+		// printf("Clause %d output: %d\n", j, clause_output);
 		// unsigned int clause_patch;
 
 		// cbpl_calculate_clause_output_feedback(&ta_state[clause_pos], output_one_patches, &clause_output, &clause_patch, number_of_ta_chunks, number_of_state_bits, filter, number_of_patches, Xi);
@@ -248,7 +248,7 @@ void cbpl_type_i_feedback(
 
 		if (clause_output && cbpl_number_of_include_actions(ta_state, j, number_of_literals, number_of_state_bits) <= max_included_literals) {
 			// Type Ia Feedback
-			printf("Type Ia feedback on Clause %d\n", j);
+			// printf("Type Ia feedback on Clause %d\n", j);
 			for (int k = 0; k < number_of_ta_chunks; ++k) {
 				unsigned int ta_pos = k*number_of_state_bits;
 
@@ -266,7 +266,7 @@ void cbpl_type_i_feedback(
 			}
 		} else {
 			// Type Ib Feedback
-			printf("Type Ib feedback on Clause %d\n", j);
+			// printf("Type Ib feedback on Clause %d\n", j);
 				
 			for (int k = 0; k < number_of_ta_chunks; ++k) {
 				unsigned int ta_pos = k*number_of_state_bits;
@@ -309,8 +309,8 @@ void cbpl_type_ii_feedback(
 
 		unsigned int clause_pos = j*number_of_ta_chunks*number_of_state_bits;
 
-		unsigned int clause_output = clause_outputs[j / 32] & (1 << (j % 32)) ? 1 : 0;
-		printf("Clause %d output: %u\n", j, clause_output);
+		unsigned int clause_output = clause_outputs[j];
+		// printf("Clause %d output: %u\n", j, clause_output);
 		// unsigned int clause_patch;
 		// cbpl_calculate_clause_output_feedback(&ta_state[clause_pos], output_one_patches, &clause_output, &clause_patch, number_of_ta_chunks, number_of_state_bits, filter, number_of_patches, Xi);
 
