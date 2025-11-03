@@ -197,13 +197,24 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         #     )
 
         for i in range(self.number_of_classes):
+            _LOGGER.debug(f"Probability calculation for class {i}")
             if i == target:
+                _LOGGER.debug("Skipping target class")
                 self.update_ps[i] = 0.0
             else:
+                _LOGGER.debug("Calculating dot product for non-target class")
+                _LOGGER.debug(f"Clause active: {self.clause_active}")
+                _LOGGER.debug(f"Weights for class {i}: {self.weight_banks[i].get_weights()}")
+                _LOGGER.debug(f"Clause outputs: {clause_outputs}")
                 self.update_ps[i] = np.dot(self.clause_active * self.weight_banks[i].get_weights(),
                                            clause_outputs).astype(np.int32)
+                _LOGGER.debug(f"Update probability for class {i} after dot product: {self.update_ps[i]}")
+                _LOGGER.debug(f"Clipping update probability for class {i} to range [-{self.T}, {self.T}]")
                 self.update_ps[i] = np.clip(self.update_ps[i], -self.T, self.T)
+                _LOGGER.debug(f"Update probability for class {i} after clipping: {self.update_ps[i]}")
                 self.update_ps[i] = 1.0 * (self.T + self.update_ps[i]) / (2 * self.T)
+                _LOGGER.debug(f"Update probability for class {i}: {self.update_ps[i]}")
+
         _LOGGER.debug(f"Update probabilities for non-target classes: {self.update_ps}")
 
         if self.update_ps.sum() == 0:
