@@ -225,6 +225,9 @@ void cbpl_type_i_feedback(
 	if (reuse_random_feedback && s > 1.0) {
 		cbpl_initialize_random_streams(feedback_to_ta, number_of_literals, number_of_ta_chunks, s);
 	}
+	for (int i = 0; i < number_of_clauses / 32; ++i) {
+		printf("Clause outputs chunk %d: 0x%08x\n", i, clause_outputs[i]);
+	}
 
 	for (int j = 0; j < number_of_clauses; ++j) {
 		if ((((float)fast_rand())/((float)FAST_RAND_MAX) > update_p) || (!clause_active[j])) {
