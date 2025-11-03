@@ -57,7 +57,12 @@ def profile(func=None, output_file='convcotm.prof'):
 
             return result
         return wrapper
-    return decorator(func)
+    
+    # If called without arguments (e.g., @profile)
+    if func is not None:
+        return decorator(func)
+    # If called with arguments (e.g., @profile(output_file='...'))
+    return decorator
 
 class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankMixin):
     def __init__(
