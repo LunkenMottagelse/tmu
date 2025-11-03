@@ -412,6 +412,9 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
                     class_observed[i] = 0
                     batch_example = example_indexes[i]
                     self.update(Ym[batch_example], batch_example, X)
+        _LOGGER.info("Model after FPGA fit:")
+        with np.printoptions(threshold=np.inf):
+            _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(self.clause_bank.model))
         return
 
     def fit(self, X, Y, shuffle=True, **kwargs):
@@ -470,6 +473,10 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
                     class_observed[i] = 0
                     batch_example = example_indexes[i]
                     self.update(Ym[batch_example], batch_example, encoded_X_train)
+        _LOGGER.info("Model after CPU fit:")
+        model = self.clause_bank.get_literals()
+        with np.printoptions(threshold=np.inf):
+            _LOGGER.info(model)
         return
 
     def _predict_fpga(self, X, clip_class_sum=False, return_class_sums: bool = False, **kwargs):
