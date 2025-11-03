@@ -301,6 +301,7 @@ class ClauseBankPL(BaseClauseBank):
         clause_outputs
     ):
         # encoded_X is wrong here, must be the randomly selected patches from PL. 
+        _LOGGER.debug(f"Clause outputs for Type I feedback: {clause_outputs}")
         ptr_cp = ffi.cast("unsigned int *", clause_patches.ctypes.data)
         ptr_clause_active = ffi.cast("unsigned int *", clause_active.ctypes.data)
         ptr_clause_outputs = ffi.cast("unsigned int *", clause_outputs.ctypes.data)
