@@ -8,13 +8,13 @@
   "handlers": {
     "console": {
       "class": "logging.StreamHandler",
-      "level": "INFO",
+      "level": "DEBUG",
       "formatter": "simple",
       "stream": "ext://sys.stdout"
     },
     "file": {
       "class": "logging.FileHandler",
-      "level": "INFO",
+      "level": "DEBUG",
       "formatter": "simple",
       "filename": "tmu.log",
       "mode": "w",
@@ -23,7 +23,7 @@
   },
   "loggers": {
     "tmu.models.classification.vanilla_classifier": {
-      "level": "INFO",
+      "level": "DEBUG",
       "handlers": [
         "console",
         "file"
@@ -32,7 +32,7 @@
     }
   },
   "root": {
-    "level": "INFO",
+    "level": "DEBUG",
     "handlers": [
       "console",
       "file"
