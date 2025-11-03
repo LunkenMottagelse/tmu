@@ -180,7 +180,10 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
             else:
                 self.update_ps[i] = np.dot(self.clause_active * self.weight_banks[i].get_weights(),
                                            clause_outputs).astype(np.int32)
-                self.update_ps[i] = np.clip(self.update_ps[i], -self.T, self.T)
+                if(self.update_ps[i] > self.T):
+                    self.update_ps[i] = self.T
+                elif (self.update_ps[i] < -self.T):
+                    self.update_ps[i] = -self.T
                 self.update_ps[i] = 1.0 * (self.T + self.update_ps[i]) / (2 * self.T)
 
         if self.update_ps.sum() == 0:
