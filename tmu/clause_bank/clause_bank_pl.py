@@ -228,17 +228,17 @@ class ClauseBankPL(BaseClauseBank):
         
         weights = self.get_weights_callback()
         w_buf = self.get_packed_weights(weights)
-        _LOGGER.info("Packed weights before sending to PL:")
-        _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(w_buf))
+        # _LOGGER.info("Packed weights before sending to PL:")
+        # _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(w_buf))
         self.weight_buffer[:] = w_buf
 
         self.get_model() # Pointer business
-        _LOGGER.info("Model before sending to PL:")
-        _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(self.model))
+        # _LOGGER.info("Model before sending to PL:")
+        # _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(self.model))
         self.ie_buffer[:] = self.model
         img = self.transform_example(X_train[e])
-        _LOGGER.info("Image before sending to PL:")
-        _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(img))
+        # _LOGGER.info("Image before sending to PL:")
+        # _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(img))
         self.image_buffer[:] = img
 
         self.ie_ol.sendchannel.transfer(self.ie_buffer)
@@ -256,8 +256,8 @@ class ClauseBankPL(BaseClauseBank):
         class_sums = self.decision_buffer[:self.number_of_classes]  # First NClasses transfers contain class sums
         # Cast to int32
         class_sums = class_sums.astype(np.int32)
-        _LOGGER.info("Class sums from PL:")
-        _LOGGER.info(class_sums)
+        # _LOGGER.info("Class sums from PL:")
+        # _LOGGER.info(class_sums)
 
         # _LOGGER.info("Class sums from PL v")
         # _LOGGER.info(class_sums)
@@ -267,13 +267,13 @@ class ClauseBankPL(BaseClauseBank):
         
         # Vectorized unpacking of clause outputs
         self.clause_output[:] = (clause_output_pl[self.clause_chunk_idx] >> self.clause_bit_idx) & 1
-        _LOGGER.info("Clause outputs from PL:")
-        _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(self.clause_output))
+        # _LOGGER.info("Clause outputs from PL:")
+        # _LOGGER.info(self.clause_output)
         
         patches = self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):]  # Then remaining transfers contain selected patches
         patches = patches.reshape((self.number_of_clauses, self.packed_patch_size))
-        _LOGGER.info("Selected patches from PL:")
-        _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(patches))
+        # _LOGGER.info("Selected patches from PL:")
+        # _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(patches))
 
         return self.clause_output, class_sums, patches
 
