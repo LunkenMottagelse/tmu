@@ -6,9 +6,6 @@ from tmu.clause_bank.base_clause_bank import BaseClauseBank
 
 import numpy as np
 import math
-import logging
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class ClauseBankPL(BaseClauseBank):
@@ -228,17 +225,11 @@ class ClauseBankPL(BaseClauseBank):
         
         weights = self.get_weights_callback()
         w_buf = self.get_packed_weights(weights)
-        # _LOGGER.info("Packed weights before sending to PL:")
-        # _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(w_buf))
         self.weight_buffer[:] = w_buf
 
         self.get_model() # Pointer business
-        # _LOGGER.info("Model before sending to PL:")
-        # _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(self.model))
         self.ie_buffer[:] = self.model
         img = self.transform_example(X_train[e])
-        # _LOGGER.info("Image before sending to PL:")
-        # _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(img))
         self.image_buffer[:] = img
 
         self.ie_ol.sendchannel.transfer(self.ie_buffer)
@@ -256,24 +247,15 @@ class ClauseBankPL(BaseClauseBank):
         class_sums = self.decision_buffer[:self.number_of_classes]  # First NClasses transfers contain class sums
         # Cast to int32
         class_sums = class_sums.astype(np.int32)
-        # _LOGGER.info("Class sums from PL:")
-        # _LOGGER.info(class_sums)
-
-        # _LOGGER.info("Class sums from PL v")
-        # _LOGGER.info(class_sums)
         
         # NOTE: these are stored densely
         clause_output_pl = self.decision_buffer[self.number_of_classes:self.number_of_classes + math.ceil(self.number_of_clauses / 32)] # Then N transfers contain clause outputs
         
         # Vectorized unpacking of clause outputs
         self.clause_output[:] = (clause_output_pl[self.clause_chunk_idx] >> self.clause_bit_idx) & 1
-        # _LOGGER.info("Clause outputs from PL:")
-        # _LOGGER.info(self.clause_output)
         
         patches = self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):]  # Then remaining transfers contain selected patches
         patches = patches.reshape((self.number_of_clauses, self.packed_patch_size))
-        # _LOGGER.info("Selected patches from PL:")
-        # _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(patches))
 
         return self.clause_output, class_sums, patches
 
@@ -301,7 +283,6 @@ class ClauseBankPL(BaseClauseBank):
         clause_outputs
     ):
         # encoded_X is wrong here, must be the randomly selected patches from PL. 
-        _LOGGER.debug(f"Clause outputs for Type I feedback: {clause_outputs}")
         ptr_cp = ffi.cast("unsigned int *", clause_patches.ctypes.data)
         ptr_clause_active = ffi.cast("unsigned int *", clause_active.ctypes.data)
         ptr_clause_outputs = ffi.cast("unsigned int *", clause_outputs.ctypes.data)
@@ -397,16 +378,6 @@ class ClauseBankPL(BaseClauseBank):
         return
 
     def get_packed_weights(self, weights):
-        """
-        Pack weights into 32-bit chunks using C implementation with transpose.
-        
-        Args:
-            weights: numpy array from get_weights_callback(), shape [rows, cols]
-                    Will be transposed to [cols, rows] during packing
-        
-        Returns:
-            packed weights array (already reversed by C code)
-        """
         # Ensure weights are int32 and contiguous
         weights_contig = np.ascontiguousarray(weights, dtype=np.int32)
         weights_p = ffi.cast("int *", weights_contig.ctypes.data)

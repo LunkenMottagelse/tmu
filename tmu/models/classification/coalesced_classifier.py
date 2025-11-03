@@ -142,18 +142,11 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
     def _update_fpga(self, target, e, X_train):
         clause_outputs, class_sums, clause_patches = self.clause_bank.calculate_clause_outputs_update_fpga(X_train, e)
 
-        _LOGGER.debug(f"Class sums: {class_sums}")
-        _LOGGER.debug(f"Clause outputs: {clause_outputs}")
-        _LOGGER.debug(f"Clause patches: {clause_patches}")
         # Extract target class sum for positive feedback
         class_sum_target = np.clip(class_sums[target], -self.T, self.T)
-        _LOGGER.debug(f"Target class sum: {class_sum_target}")
         update_p = (self.T - class_sum_target) / (2 * self.T)
-        _LOGGER.debug(f"Update probability: {update_p}")
 
         # type_iii_feedback_selection = self.rng.choice(2)
-        _LOGGER.debug(f"Clause weights before update: {self.weight_banks[target].get_weights()}")
-        _LOGGER.debug(f"Clause active: {self.clause_active}")
         self.clause_bank.type_i_feedback(
             update_p=update_p * self.type_i_p,
             clause_active=self.clause_active * (self.weight_banks[target].get_weights() >= 0),
@@ -169,7 +162,6 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         )
 
         if (self.weight_banks[target].get_weights() >= 0).sum() < self.max_positive_clauses:
-            _LOGGER.debug(f"Incrementing weights for target class {target}")
             self.weight_banks[target].increment(
                 clause_output=clause_outputs,
                 update_p=update_p,
@@ -177,45 +169,14 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
                 positive_weights=True
             )
 
-        # if self.type_iii_feedback and type_iii_feedback_selection == 0:
-        #     self.clause_bank.type_iii_feedback(
-        #         update_p=update_p,
-        #         clause_active=self.clause_active * (self.weight_banks[target].get_weights() >= 0),
-        #         literal_active=self.literal_active,
-        #         encoded_X=encoded_X_train,
-        #         e=e,
-        #         target=1
-        #     )
-
-        #     self.clause_bank.type_iii_feedback(
-        #         update_p=update_p,
-        #         clause_active=self.clause_active * (self.weight_banks[target].get_weights() < 0),
-        #         literal_active=self.literal_active,
-        #         encoded_X=encoded_X_train,
-        #         e=e,
-        #         target=0
-        #     )
-
         for i in range(self.number_of_classes):
-            _LOGGER.debug(f"Probability calculation for class {i}")
             if i == target:
-                _LOGGER.debug("Skipping target class")
                 self.update_ps[i] = 0.0
             else:
-                _LOGGER.debug("Calculating dot product for non-target class")
-                _LOGGER.debug(f"Clause active: {self.clause_active}")
-                _LOGGER.debug(f"Weights for class {i}: {self.weight_banks[i].get_weights()}")
-                _LOGGER.debug(f"Clause outputs: {clause_outputs}")
                 self.update_ps[i] = np.dot(self.clause_active * self.weight_banks[i].get_weights(),
                                            clause_outputs).astype(np.int32)
-                _LOGGER.debug(f"Update probability for class {i} after dot product: {self.update_ps[i]}")
-                _LOGGER.debug(f"Clipping update probability for class {i} to range [-{self.T}, {self.T}]")
                 self.update_ps[i] = np.clip(self.update_ps[i], -self.T, self.T)
-                _LOGGER.debug(f"Update probability for class {i} after clipping: {self.update_ps[i]}")
                 self.update_ps[i] = 1.0 * (self.T + self.update_ps[i]) / (2 * self.T)
-                _LOGGER.debug(f"Update probability for class {i}: {self.update_ps[i]}")
-
-        _LOGGER.debug(f"Update probabilities for non-target classes: {self.update_ps}")
 
         if self.update_ps.sum() == 0:
             return
@@ -242,25 +203,6 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
             clause_patches=clause_patches,
             clause_outputs=clause_outputs
         )
-
-        # if self.type_iii_feedback and type_iii_feedback_selection == 1:
-        #     self.clause_bank.type_iii_feedback(
-        #         update_p=update_p,
-        #         clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() < 0),
-        #         literal_active=self.literal_active,
-        #         encoded_X=encoded_X_train,
-        #         e=e,
-        #         target=1
-        #     )
-
-        #     self.clause_bank.type_iii_feedback(
-        #         update_p=update_p,
-        #         clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() >= 0),
-        #         literal_active=self.literal_active,
-        #         encoded_X=encoded_X_train,
-        #         e=e,
-        #         target=0
-        #     )
 
         self.weight_banks[not_target].decrement(
             clause_output=clause_outputs,
@@ -386,8 +328,8 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
             negative_weights=True
         )
 
+    @profile(output_file='fpga_fit.prof')
     def _fit_fpga(self, X, Y, shuffle=True, **kwargs):
-        _LOGGER.info("Starting FPGA fit method.")
         self.init(X, Y)
 
         Ym = np.ascontiguousarray(Y).astype(np.uint32)
@@ -423,11 +365,9 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
                     class_observed[i] = 0
                     batch_example = example_indexes[i]
                     self.update(Ym[batch_example], batch_example, X)
-        _LOGGER.info("Model after FPGA fit:")
-        with np.printoptions(threshold=np.inf):
-            _LOGGER.info(np.vectorize(lambda x: f"0x{x:08x}")(self.clause_bank.model))
         return
 
+    @profile(output_file='cpu_fit.prof')
     def fit(self, X, Y, shuffle=True, **kwargs):
         self.init(X, Y)
 
@@ -484,10 +424,6 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
                     class_observed[i] = 0
                     batch_example = example_indexes[i]
                     self.update(Ym[batch_example], batch_example, encoded_X_train)
-        _LOGGER.info("Model after CPU fit:")
-        model = self.clause_bank.get_literals()
-        with np.printoptions(threshold=np.inf):
-            _LOGGER.info(model)
         return
 
     def _predict_fpga(self, X, clip_class_sum=False, return_class_sums: bool = False, **kwargs):
