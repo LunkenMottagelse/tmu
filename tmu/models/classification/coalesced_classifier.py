@@ -223,15 +223,15 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         )
 
     def _update_verify_fpga(self, target, e, encoded_X_train, X_train):
+        self.clause_bank.log_debug_clause_bank(X_train, e)
+
         verify_clause_outputs, verify_class_sums, verify_clause_patches = self.clause_bank.calculate_clause_outputs_update_fpga(X_train, e)
-        
         clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, e)
         
         if not np.array_equal(clause_outputs, verify_clause_outputs):
             _LOGGER.warning(f"Clause outputs do not match for sample {e}!")
             _LOGGER.warning(f"Software clause outputs: {clause_outputs}")
             _LOGGER.warning(f"FPGA clause outputs: {verify_clause_outputs}")
-            self.clause_bank.log_debug_clause_bank(X_train, e)
 
         class_sum = np.dot(self.clause_active * self.weight_banks[target].get_weights(), clause_outputs).astype(
             np.int32)
