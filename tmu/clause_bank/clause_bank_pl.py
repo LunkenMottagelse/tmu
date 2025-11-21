@@ -441,6 +441,20 @@ class ClauseBankPL(BaseClauseBank):
             self.dim[1]
         )
         return self.transformed_example
+    
+    def prepare_X(
+            self,
+            X
+    ):
+        return tmu.tools.encode(
+            X,
+            X.shape[0],
+            self.number_of_patches,
+            self.number_of_ta_chunks,
+            self.dim,
+            self.patch_dim,
+            0
+        )
 
     def prepare_X_autoencoder(
             self,
