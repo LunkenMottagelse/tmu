@@ -332,7 +332,7 @@ class TMBaseModel:
             clause_bank_type, clause_bank_args = self._build_gpu_bank(X=X)
         elif self.platform == "CPU_sparse":
             clause_bank_type, clause_bank_args = self._build_cpu_sparse_bank(X=X)
-        elif self.platform == "FPGA":
+        elif self.platform in ["FPGA", "FPGA_VERIFY"]:
             clause_bank_type, clause_bank_args = self._build_pl_bank(X=X, Y=Y)
         else:
             raise NotImplementedError(f"Could not find platform of type {self.platform}.")
