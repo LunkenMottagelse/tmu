@@ -259,6 +259,20 @@ class ClauseBankPL(BaseClauseBank):
 
         return self.clause_output, class_sums, patches
 
+    def log_debug_clause_bank(self, X_train, e):
+        weights = self.get_weights_callback()
+        w_weights = self.get_packed_weights(weights)
+        self.get_model() # Pointer business
+        w_model = self.model
+        w_image = self.transform_example(X_train[e])
+
+        print("Encoded Image:")
+        print(np.char.mod("0x%08X", w_image))
+        print("Model:")
+        print(np.char.mod("0x%08X", w_model))
+        print("Weights:")
+        print(np.char.mod("0x%08X", w_weights))
+
     def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
         # Classic method
         xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
