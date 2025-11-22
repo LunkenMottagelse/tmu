@@ -111,6 +111,7 @@ class ClauseBank(BaseClauseBank):
         self.packed_patch_size = math.ceil(self.number_of_literals / 32.0)
         
         self.model = np.empty(self.number_of_clauses * self.number_of_ta_chunks, dtype=np.uint32, order="c")
+        self.transformed_example = np.empty(self.dim[0] * math.ceil(self.dim[1] / 32.0), dtype=np.uint32, order="c")
         self.packed_weights_buffer = np.empty(packed_weight_size, dtype=np.uint32, order="c")
 
         self.image_buffer = allocate(shape=(packed_image_size,), dtype=np.uint32, cacheable=1)
@@ -153,6 +154,7 @@ class ClauseBank(BaseClauseBank):
         self.previous_xi_p = ffi.cast("unsigned int *", self.previous_xi.ctypes.data)
 
         self.packed_weights_p = ffi.cast("unsigned int *", self.packed_weights_buffer.ctypes.data)
+        self.transformed_example_p = ffi.cast("unsigned int *", self.transformed_example.ctypes.data)
         self.model_p = ffi.cast("unsigned int *", self.model.ctypes.data)
 
     def initialize_clauses(self):
@@ -555,3 +557,16 @@ class ClauseBank(BaseClauseBank):
             self.model_p
         )
         return
+    
+    def transform_example(
+            self,
+            X
+    ):
+        X_p = ffi.cast("unsigned int *", X.ctypes.data)
+        lib.cbpl_transform_example(
+            X_p,
+            self.transformed_example_p,
+            self.dim[0],
+            self.dim[1]
+        )
+        return self.transformed_example
