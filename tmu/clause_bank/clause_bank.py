@@ -119,6 +119,11 @@ class ClauseBank(BaseClauseBank):
         self.ie_buffer = allocate(shape=(self.number_of_clauses * self.number_of_ta_chunks,), dtype=np.uint32, cacheable=1)
         self.decision_buffer = allocate(shape=(self.number_of_classes + packed_clauses_size + self.packed_patch_size*self.number_of_clauses,), dtype=np.uint32, cacheable=1)
 
+        # Pre-compute indices for vectorized clause output unpacking
+        clause_indices = np.arange(self.number_of_clauses, dtype=np.uint32)
+        self.clause_chunk_idx = clause_indices // 32
+        self.clause_bit_idx = clause_indices % 32
+        
         # Finally, map numpy arrays to CFFI compatible pointers.
         self._cffi_init()
 
