@@ -120,6 +120,8 @@ class ClauseBank(BaseClauseBank):
         packed_weight_size = math.ceil(number_of_classes * self.number_of_clauses / math.floor(32 / bits_per_weight))
         self.packed_patch_size = math.ceil(self.number_of_literals / 32.0)
         
+        self.packed_weights_buffer = np.empty(packed_weight_size, dtype=np.uint32, order="c")
+
         self.image_buffer = allocate(shape=(packed_image_size,), dtype=np.uint32, cacheable=1)
         self.weight_buffer = allocate(shape=(packed_weight_size,), dtype=np.uint32, cacheable=1)
         self.ie_buffer = allocate(shape=(self.number_of_clauses * self.number_of_ta_chunks,), dtype=np.uint32, cacheable=1)
@@ -149,6 +151,8 @@ class ClauseBank(BaseClauseBank):
         self.lcmp_p = ffi.cast("unsigned int *", self.literal_clause_map_pos.ctypes.data)
         self.flpc_p = ffi.cast("unsigned int *", self.false_literals_per_clause.ctypes.data)
         self.previous_xi_p = ffi.cast("unsigned int *", self.previous_xi.ctypes.data)
+
+        self.packed_weights_p = ffi.cast("unsigned int *", self.packed_weights_buffer.ctypes.data)
 
     def initialize_clauses(self):
         self.clause_bank = np.empty(
@@ -524,3 +528,19 @@ class ClauseBank(BaseClauseBank):
                                              int(accumulation))
 
         return X.reshape((1, -1)), target_value
+
+
+    def get_packed_weights(self, weights):
+        # Ensure weights are int32 and contiguous
+        weights_contig = np.ascontiguousarray(weights, dtype=np.int32)
+        weights_p = ffi.cast("int *", weights_contig.ctypes.data)
+        
+        lib.cbpl_pack_weights(
+            weights_p,
+            self.packed_weights_p,
+            weights_contig.shape[0],  # num_rows
+            weights_contig.shape[1],  # num_cols
+            9 # bits_per_weight
+        )
+        
+        return self.packed_weights_buffer
