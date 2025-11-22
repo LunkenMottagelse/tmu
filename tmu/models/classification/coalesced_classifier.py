@@ -287,28 +287,28 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
     def update(self, target, e, encoded_X_train, X_train):
         clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, e)
         
-        verify_clause_outputs, verify_clause_sums, verify_patches = self.clause_bank.calculate_clause_outputs_update_fpga(X_train, e)
+        # verify_clause_outputs, verify_clause_sums, verify_patches = self.clause_bank.calculate_clause_outputs_update_fpga(X_train, e)
 
-        if not np.array_equal(clause_outputs, verify_clause_outputs):
-            self.clause_bank.log_debug_clause_bank(X_train, e)
-            print(f"Clause outputs do not match for sample {e}!")
-            print(f"Software clause outputs: {clause_outputs}")
-            print(f"FPGA clause outputs: {verify_clause_outputs}")
+        # if not np.array_equal(clause_outputs, verify_clause_outputs):
+        #     self.clause_bank.log_debug_clause_bank(X_train, e)
+        #     print(f"Clause outputs do not match for sample {e}!")
+        #     print(f"Software clause outputs: {clause_outputs}")
+        #     print(f"FPGA clause outputs: {verify_clause_outputs}")
 
         class_sum = np.dot(self.clause_active * self.weight_banks[target].get_weights(), clause_outputs).astype(
             np.int32)
         
-        if not (class_sum, verify_clause_sums[target]):
-            print(f"Class sum does not match for sample {e}!")
-            print(f"Software class sum: {class_sum}")
-            print(f"FPGA class sum: {verify_clause_sums[target]}")
+        # if not (class_sum, verify_clause_sums[target]):
+        #     print(f"Class sum does not match for sample {e}!")
+        #     print(f"Software class sum: {class_sum}")
+        #     print(f"FPGA class sum: {verify_clause_sums[target]}")
 
-        if e % 100 == 0:
-            self.clause_bank.log_debug_clause_bank(X_train, e)
-            print(f"Debug info for sample {e} logged. Here comes the patches:")
-            print(np.char.mod("0x%08X", verify_patches))
-            print("Clause Outputs:")
-            print(np.char.mod("0x%08X", verify_clause_outputs))
+        # if e % 100 == 0:
+        #     self.clause_bank.log_debug_clause_bank(X_train, e)
+        #     print(f"Debug info for sample {e} logged. Here comes the patches:")
+        #     print(np.char.mod("0x%08X", verify_patches))
+        #     print("Clause Outputs:")
+        #     print(verify_clause_outputs)
 
 
 
