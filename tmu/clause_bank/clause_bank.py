@@ -94,16 +94,6 @@ class ClauseBank(BaseClauseBank):
 
         self.initialize_clauses()
 
-        # Finally, map numpy arrays to CFFI compatible pointers.
-        self._cffi_init()
-
-        # Set pcg32 seed
-        if self.seed is not None:
-            assert isinstance(self.seed, int), "Seed must be a integer"
-
-            lib.pcg32_seed(self.seed)
-            lib.xorshift128p_seed(self.seed)
-
         # Program PL
         from pynq import Overlay
         from pynq import allocate
@@ -127,6 +117,15 @@ class ClauseBank(BaseClauseBank):
         self.ie_buffer = allocate(shape=(self.number_of_clauses * self.number_of_ta_chunks,), dtype=np.uint32, cacheable=1)
         self.decision_buffer = allocate(shape=(number_of_classes + packed_clauses_size + self.packed_patch_size*self.number_of_clauses,), dtype=np.uint32, cacheable=1)
 
+        # Finally, map numpy arrays to CFFI compatible pointers.
+        self._cffi_init()
+
+        # Set pcg32 seed
+        if self.seed is not None:
+            assert isinstance(self.seed, int), "Seed must be a integer"
+
+            lib.pcg32_seed(self.seed)
+            lib.xorshift128p_seed(self.seed)
 
     def _cffi_init(self):
         self.co_p = ffi.cast("unsigned int *", self.clause_output.ctypes.data)  # clause_output
