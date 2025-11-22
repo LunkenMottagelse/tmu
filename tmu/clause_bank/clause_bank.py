@@ -24,6 +24,7 @@ import tmu.tools
 from tmu.clause_bank.base_clause_bank import BaseClauseBank
 
 import numpy as np
+import math
 
 
 class ClauseBank(BaseClauseBank):
@@ -56,6 +57,7 @@ class ClauseBank(BaseClauseBank):
         self.number_of_state_bits_ind = int(number_of_state_bits_ind)
         self.batch_size = batch_size
         self.incremental = incremental
+        self.get_weights_callback = kwargs.get("get_weights_callback", None)
 
         self.clause_output = np.empty(self.number_of_clauses, dtype=np.uint32, order="c")
         self.clause_output_batch = np.empty(self.number_of_clauses * batch_size, dtype=np.uint32, order="c")
@@ -101,6 +103,28 @@ class ClauseBank(BaseClauseBank):
 
             lib.pcg32_seed(self.seed)
             lib.xorshift128p_seed(self.seed)
+
+        # Program PL
+        from pynq import Overlay
+        from pynq import allocate
+
+        self.ol = Overlay("/home/xilinx/modded_tmu/bitfiles/TM_Inference.bit") # Hardcoded path to bitfiles
+        self.img_decision_ol = self.ol.axi_dma_0
+        self.ie_ol = self.ol.axi_dma_1
+        self.weight_ol = self.ol.axi_dma_2
+
+        bits_per_weight = 9
+        number_of_classes = 10
+        packed_image_size = self.dim[1] * math.ceil(self.dim[2] / 32.0)
+        packed_clauses_size = math.ceil(self.number_of_clauses / 32.0)
+        packed_weight_size = math.ceil(number_of_classes * self.number_of_clauses / math.floor(32 / bits_per_weight))
+        self.packed_patch_size = math.ceil(self.number_of_literals / 32.0)
+        
+        self.image_buffer = allocate(shape=(packed_image_size,), dtype=np.uint32, cacheable=1)
+        self.weight_buffer = allocate(shape=(packed_weight_size,), dtype=np.uint32, cacheable=1)
+        self.ie_buffer = allocate(shape=(self.number_of_clauses * self.number_of_ta_chunks,), dtype=np.uint32, cacheable=1)
+        self.decision_buffer = allocate(shape=(number_of_classes + packed_clauses_size + self.packed_patch_size*self.number_of_clauses,), dtype=np.uint32, cacheable=1)
+
 
     def _cffi_init(self):
         self.co_p = ffi.cast("unsigned int *", self.clause_output.ctypes.data)  # clause_output
@@ -202,7 +226,7 @@ class ClauseBank(BaseClauseBank):
 
         return self.clause_output_batch.reshape((self.batch_size, self.number_of_clauses))[e % self.batch_size, :]
 
-    def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
+    def calculate_clause_outputs_update(self, literal_active, encoded_X, X_train, e):
         xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
         la_p = ffi.cast("unsigned int *", literal_active.ctypes.data)
 
@@ -216,6 +240,14 @@ class ClauseBank(BaseClauseBank):
             la_p,
             xi_p
         )
+
+        verify_clause_outputs, _, _ = self.calculate_clause_outputs_update_fpga(X_train, e)
+
+        if not np.array_equal(self.clause_output, verify_clause_outputs):
+            self.log_debug_clause_bank(X_train, e)
+            print(f"Clause outputs do not match for sample {e}!")
+            print(f"Software clause outputs: {self.clause_output}")
+            print(f"FPGA clause outputs: {verify_clause_outputs}")
 
         return self.clause_output
 
@@ -233,6 +265,64 @@ class ClauseBank(BaseClauseBank):
         )
 
         return self.clause_output_patchwise
+
+    def calculate_clause_outputs_update_fpga(self, X_train, e):
+        # Get weights using callback function
+        if self.get_weights_callback is None:
+            raise RuntimeError("get_weights_callback is not set. Please provide a callback function when creating ClauseBankPL.")
+        
+        weights = self.get_weights_callback()
+        w_buf = self.get_packed_weights(weights)
+        self.weight_buffer[:] = w_buf
+
+        self.get_model() # Pointer business
+        self.ie_buffer[:] = self.model
+        img = self.transform_example(X_train[e])
+        self.image_buffer[:] = img
+
+        self.ie_ol.sendchannel.transfer(self.ie_buffer)
+        self.ie_ol.sendchannel.wait()
+        self.weight_ol.sendchannel.transfer(self.weight_buffer)
+        self.weight_ol.sendchannel.wait()
+        self.img_decision_ol.sendchannel.transfer(self.image_buffer)
+        self.img_decision_ol.sendchannel.wait()
+        self.img_decision_ol.recvchannel.transfer(self.decision_buffer)
+
+        # 2: capture output
+        self.img_decision_ol.recvchannel.wait()
+
+        # 3: store output in correct location.
+        # class sums -> First NClasses transfers contain class sums
+        # clause_output -> Then N transfers contain clause outputs
+        # selected_patches -> Then remaining transfers contain selected patches
+        class_sums = self.decision_buffer[:self.number_of_classes]  # First NClasses transfers contain class sums
+        # Cast to int32
+        class_sums = class_sums.astype(np.int32)
+        
+        # NOTE: these are stored densely
+        clause_output_pl = self.decision_buffer[self.number_of_classes:self.number_of_classes + math.ceil(self.number_of_clauses / 32)] # Then N transfers contain clause outputs
+        
+        # Vectorized unpacking of clause outputs
+        self.clause_output[:] = (clause_output_pl[self.clause_chunk_idx] >> self.clause_bit_idx) & 1
+        
+        patches = self.decision_buffer[self.number_of_classes + math.ceil(self.number_of_clauses / 32):]  # Then remaining transfers contain selected patches
+        patches = patches.reshape((self.number_of_clauses, self.packed_patch_size))
+
+        return self.clause_output, class_sums, patches
+
+    def log_debug_clause_bank(self, X_train, e):
+        weights = self.get_weights_callback()
+        w_weights = self.get_packed_weights(weights)
+        self.get_model() # Pointer business
+        w_model = self.model
+        w_image = self.transform_example(X_train[e])
+
+        print("Encoded Image:")
+        print(np.char.mod("0x%08X", w_image))
+        print("Model:")
+        print(np.char.mod("0x%08X", w_model))
+        print("Weights:")
+        print(np.char.mod("0x%08X", w_weights))
 
     def type_i_feedback(
         self,

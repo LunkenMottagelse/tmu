@@ -284,8 +284,8 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
             )
 
 
-    def update(self, target, e, encoded_X_train):
-        clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, e)
+    def update(self, target, e, encoded_X_train, X_train):
+        clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, X_train, e)
 
         class_sum = np.dot(self.clause_active * self.weight_banks[target].get_weights(), clause_outputs).astype(
             np.int32)
@@ -553,7 +553,7 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
                 for i in range(self.number_of_classes):
                     class_observed[i] = 0
                     batch_example = example_indexes[i]
-                    self.update(Ym[batch_example], batch_example, encoded_X_train)
+                    self.update(Ym[batch_example], batch_example, encoded_X_train, X)
         return
 
     def _predict_fpga(self, X, clip_class_sum=False, return_class_sums: bool = False, **kwargs):

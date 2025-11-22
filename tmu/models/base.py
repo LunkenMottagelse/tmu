@@ -220,6 +220,22 @@ class TMBaseModel:
     def _build_cpu_bank(self, X: np.ndarray):
         from tmu.clause_bank.clause_bank import ClauseBank
         clause_bank_type = ClauseBank
+
+        # Create callback function to get weights from weight banks
+        # This will be called during calculate_clause_outputs_update
+        def get_weights_callback():
+            if hasattr(self, 'weight_banks'):
+                # MultiWeightBankMixin case - get weights from all banks
+                weights_list = []
+                for i in range(10):
+                    weights_list.append(self.weight_banks[i].get_weights())
+                return np.array(weights_list).T  # Shape: [clauses, classes]
+            elif hasattr(self, 'weight_bank'):
+                # SingleWeightBankMixin case
+                return self.weight_bank.get_weights()
+            else:
+                raise RuntimeError("No weight bank found in the model")
+
         clause_bank_args = dict(
             X_shape=X.shape,
             d=self.d,
@@ -235,6 +251,7 @@ class TMBaseModel:
             incremental=self.incremental,
             type_ia_ii_feedback_ratio=self.type_ia_ii_feedback_ratio,
             seed=self.seed,
+            get_weights_callback=get_weights_callback,
         )
         return clause_bank_type, clause_bank_args
 
@@ -332,7 +349,7 @@ class TMBaseModel:
             clause_bank_type, clause_bank_args = self._build_gpu_bank(X=X)
         elif self.platform == "CPU_sparse":
             clause_bank_type, clause_bank_args = self._build_cpu_sparse_bank(X=X)
-        elif self.platform in ["FPGA", "FPGA_VERIFY"]:
+        elif self.platform in ["FPGA"]:
             clause_bank_type, clause_bank_args = self._build_pl_bank(X=X, Y=Y)
         else:
             raise NotImplementedError(f"Could not find platform of type {self.platform}.")
