@@ -290,7 +290,7 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         verify_clause_outputs, verify_clause_sums, verify_patches = self.clause_bank.calculate_clause_outputs_update_fpga(X_train, e)
 
         if not np.array_equal(clause_outputs, verify_clause_outputs):
-            self.log_debug_clause_bank(X_train, e)
+            self.clause_bank.log_debug_clause_bank(X_train, e)
             print(f"Clause outputs do not match for sample {e}!")
             print(f"Software clause outputs: {clause_outputs}")
             print(f"FPGA clause outputs: {verify_clause_outputs}")
@@ -302,7 +302,14 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
             print(f"Class sum does not match for sample {e}!")
             print(f"Software class sum: {class_sum}")
             print(f"FPGA class sum: {verify_clause_sums[target]}")
-            
+
+        if e == 100:
+            self.clause_bank.log_debug_clause_bank(X_train, e)
+            print(f"Debug info for sample {e} logged. Here comes the patches:")
+            print(np.char.mod("0x%08X", verify_patches))
+
+
+
         class_sum = np.clip(class_sum, -self.T, self.T)
         update_p = (self.T - class_sum) / (2 * self.T)
 
