@@ -104,10 +104,10 @@ class ClauseBank(BaseClauseBank):
         self.weight_ol = self.ol.axi_dma_2
 
         bits_per_weight = 9
-        number_of_classes = 10
+        self.number_of_classes = 10
         packed_image_size = self.dim[1] * math.ceil(self.dim[2] / 32.0)
         packed_clauses_size = math.ceil(self.number_of_clauses / 32.0)
-        packed_weight_size = math.ceil(number_of_classes * self.number_of_clauses / math.floor(32 / bits_per_weight))
+        packed_weight_size = math.ceil(self.number_of_classes * self.number_of_clauses / math.floor(32 / bits_per_weight))
         self.packed_patch_size = math.ceil(self.number_of_literals / 32.0)
         
         self.model = np.empty(self.number_of_clauses * self.number_of_ta_chunks, dtype=np.uint32, order="c")
@@ -117,7 +117,7 @@ class ClauseBank(BaseClauseBank):
         self.image_buffer = allocate(shape=(packed_image_size,), dtype=np.uint32, cacheable=1)
         self.weight_buffer = allocate(shape=(packed_weight_size,), dtype=np.uint32, cacheable=1)
         self.ie_buffer = allocate(shape=(self.number_of_clauses * self.number_of_ta_chunks,), dtype=np.uint32, cacheable=1)
-        self.decision_buffer = allocate(shape=(number_of_classes + packed_clauses_size + self.packed_patch_size*self.number_of_clauses,), dtype=np.uint32, cacheable=1)
+        self.decision_buffer = allocate(shape=(self.number_of_classes + packed_clauses_size + self.packed_patch_size*self.number_of_clauses,), dtype=np.uint32, cacheable=1)
 
         # Finally, map numpy arrays to CFFI compatible pointers.
         self._cffi_init()
