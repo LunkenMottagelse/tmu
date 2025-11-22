@@ -110,6 +110,7 @@ class ClauseBank(BaseClauseBank):
         packed_weight_size = math.ceil(number_of_classes * self.number_of_clauses / math.floor(32 / bits_per_weight))
         self.packed_patch_size = math.ceil(self.number_of_literals / 32.0)
         
+        self.model = np.empty(self.number_of_clauses * self.number_of_ta_chunks, dtype=np.uint32, order="c")
         self.packed_weights_buffer = np.empty(packed_weight_size, dtype=np.uint32, order="c")
 
         self.image_buffer = allocate(shape=(packed_image_size,), dtype=np.uint32, cacheable=1)
@@ -152,6 +153,7 @@ class ClauseBank(BaseClauseBank):
         self.previous_xi_p = ffi.cast("unsigned int *", self.previous_xi.ctypes.data)
 
         self.packed_weights_p = ffi.cast("unsigned int *", self.packed_weights_buffer.ctypes.data)
+        self.model_p = ffi.cast("unsigned int *", self.model.ctypes.data)
 
     def initialize_clauses(self):
         self.clause_bank = np.empty(
@@ -543,3 +545,13 @@ class ClauseBank(BaseClauseBank):
         )
         
         return self.packed_weights_buffer
+    
+    def get_model(self, independent=False):
+        lib.cbpl_get_model(
+            self.ptr_ta_state_ind if independent else self.ptr_ta_state,
+            self.number_of_clauses,
+            self.number_of_literals,
+            self.number_of_state_bits_ta,
+            self.model_p
+        )
+        return
