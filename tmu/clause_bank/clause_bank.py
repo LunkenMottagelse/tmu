@@ -238,7 +238,7 @@ class ClauseBank(BaseClauseBank):
 
         return self.clause_output_batch.reshape((self.batch_size, self.number_of_clauses))[e % self.batch_size, :]
 
-    def calculate_clause_outputs_update(self, literal_active, encoded_X, X_train, e):
+    def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
         xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
         la_p = ffi.cast("unsigned int *", literal_active.ctypes.data)
 
@@ -252,16 +252,6 @@ class ClauseBank(BaseClauseBank):
             la_p,
             xi_p
         )
-
-        verify_clause_outputs, _, _ = self.calculate_clause_outputs_update_fpga(X_train, e)
-
-        if not np.array_equal(self.clause_output, verify_clause_outputs):
-            self.log_debug_clause_bank(X_train, e)
-            print(f"Clause outputs do not match for sample {e}!")
-            print(f"Software clause outputs: {self.clause_output}")
-            print(f"FPGA clause outputs: {verify_clause_outputs}")
-        else:
-            print("All good")
 
         return self.clause_output
 
