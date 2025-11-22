@@ -260,6 +260,8 @@ class ClauseBank(BaseClauseBank):
             print(f"Clause outputs do not match for sample {e}!")
             print(f"Software clause outputs: {self.clause_output}")
             print(f"FPGA clause outputs: {verify_clause_outputs}")
+        else:
+            print("All good")
 
         return self.clause_output
 
