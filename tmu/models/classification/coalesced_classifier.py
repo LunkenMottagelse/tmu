@@ -303,10 +303,12 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
             print(f"Software class sum: {class_sum}")
             print(f"FPGA class sum: {verify_clause_sums[target]}")
 
-        if e == 100:
+        if e % 100 == 0:
             self.clause_bank.log_debug_clause_bank(X_train, e)
             print(f"Debug info for sample {e} logged. Here comes the patches:")
             print(np.char.mod("0x%08X", verify_patches))
+            print("Clause Outputs:")
+            print(np.char.mod("0x%08X", verify_clause_outputs))
 
 
 
