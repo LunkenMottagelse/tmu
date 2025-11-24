@@ -247,6 +247,8 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
 
         if something_is_wrong:
             self.clause_bank.log_debug_clause_bank(X_train, e)
+        else:
+            _LOGGER.info(f"Sample {e} verified successfully.")
 
 
         class_sum = np.dot(self.clause_active * self.weight_banks[target].get_weights(), clause_outputs).astype(
