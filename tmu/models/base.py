@@ -343,7 +343,7 @@ class TMBaseModel:
         return clause_bank_type, clause_bank_args
 
     def build_clause_bank(self, X: np.ndarray, Y: np.ndarray = None):
-        if self.platform == "CPU":
+        if self.platform in ["CPU", "FPGA_VERIFY"]:
             clause_bank_type, clause_bank_args = self._build_cpu_bank(X=X)
         elif self.platform in ["GPU", "CUDA"]:
             clause_bank_type, clause_bank_args = self._build_gpu_bank(X=X)
