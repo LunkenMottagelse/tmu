@@ -223,15 +223,31 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         )
 
     def _update_verify_fpga(self, target, e, encoded_X_train, X_train):
-        self.clause_bank.log_debug_clause_bank(X_train, e)
+        something_is_wrong = False
 
         verify_clause_outputs, verify_class_sums, verify_clause_patches = self.clause_bank.calculate_clause_outputs_update_fpga(X_train, e)
         clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, e)
-        
+
+        # Check clause outputs
         if not np.array_equal(clause_outputs, verify_clause_outputs):
             _LOGGER.warning(f"Clause outputs do not match for sample {e}!")
             _LOGGER.warning(f"Software clause outputs: {clause_outputs}")
             _LOGGER.warning(f"FPGA clause outputs: {verify_clause_outputs}")
+            something_is_wrong = True
+
+        # Check class sums
+        for i in range(self.number_of_classes):
+            class_sum = np.dot(self.clause_active * self.weight_banks[i].get_weights(), clause_outputs).astype(np.int32)
+            class_sum = np.clip(class_sum, -self.T, self.T)
+            if class_sum != verify_class_sums[i]:
+                _LOGGER.warning(f"Class sum for class {i} does not match for sample {e}!")
+                _LOGGER.warning(f"Software class sum: {class_sum}")
+                _LOGGER.warning(f"FPGA class sum: {verify_class_sums[i]}")
+                something_is_wrong = True
+
+        if something_is_wrong:
+            self.clause_bank.log_debug_clause_bank(X_train, e)
+
 
         class_sum = np.dot(self.clause_active * self.weight_banks[target].get_weights(), clause_outputs).astype(
             np.int32)
