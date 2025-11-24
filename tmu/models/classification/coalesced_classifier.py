@@ -238,7 +238,7 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         # Check class sums
         for i in range(self.number_of_classes):
             class_sum = np.dot(self.clause_active * self.weight_banks[i].get_weights(), clause_outputs).astype(np.int32)
-            class_sum = np.clip(class_sum, -self.T, self.T)
+            # class_sum = np.clip(class_sum, -self.T, self.T)
             if class_sum != verify_class_sums[i]:
                 _LOGGER.warning(f"Class sum for class {i} does not match for sample {e}!")
                 _LOGGER.warning(f"Software class sum: {class_sum}")
