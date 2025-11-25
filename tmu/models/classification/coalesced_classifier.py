@@ -248,9 +248,11 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         if something_is_wrong:
             self.clause_bank.log_debug_clause_bank(X_train, e)
             _LOGGER.info("Weights would look like this:")
-            classes = np.array((self.number_of_classes, self.number_of_clauses))
+            classes = []
             for i in range(self.number_of_classes):
-                classes[i] = self.weight_banks[i].get_weights()
+                single_class = self.weight_banks[i].get_weights()
+                classes.append(single_class)
+            classes = np.array(classes)
             _LOGGER.info(np.transpose(classes))
         else:
             _LOGGER.info(f"Sample {e} verified successfully.")
