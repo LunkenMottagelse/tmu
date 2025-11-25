@@ -243,11 +243,15 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
                 _LOGGER.warning(f"Class sum for class {i} does not match for sample {e}!")
                 _LOGGER.warning(f"Software class sum: {class_sum}")
                 _LOGGER.warning(f"FPGA class sum: {verify_class_sums[i]}")
-                _LOGGER.warning(f"Intended weights for this class:{self.weight_banks[i].get_weights()}")
                 something_is_wrong = True
 
         if something_is_wrong:
             self.clause_bank.log_debug_clause_bank(X_train, e)
+            _LOGGER.info("Weights would look like this:")
+            classes = np.array((self.number_of_classes, self.number_of_clauses))
+            for i in range(self.number_of_classes):
+                classes[i] = self.weight_banks[i].get_weights()
+            _LOGGER.info(np.transpose(classes))
         else:
             _LOGGER.info(f"Sample {e} verified successfully.")
 
