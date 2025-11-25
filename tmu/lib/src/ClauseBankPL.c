@@ -526,9 +526,8 @@ void cbpl_pack_weights(
 	int weight_count = 0;
 	int total_weights = num_rows * num_cols;
 	
-	// Iterate in transposed order: for each column, then each row
-	for (int col = 0; col < num_cols; col++) {
-		for (int row = 0; row < num_rows; row++) {
+	for (int row = 0; row < num_rows; row++) {
+		for (int col = 0; col < num_cols; col++) {
 			// Reset chunk when starting a new one
 			if (weight_count % num_weights_per_chunk == 0) {
 				chunk = 0;
@@ -544,8 +543,8 @@ void cbpl_pack_weights(
 			// OR the masked weight into the chunk
 			chunk |= masked_weight << bit_position;
 			
-			// Check if chunk is full or if this is the last element
-			if ((weight_count % num_weights_per_chunk == num_weights_per_chunk - 1) || (weight_count == total_weights - 1)) {
+			// Check if chunk is full or if the clause is fully written
+			if ((weight_count % num_weights_per_chunk == num_weights_per_chunk - 1) || (col == (num_cols - 1))) {
 				packed_weights[packed_idx++] = chunk;
 			}
 			

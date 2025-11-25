@@ -52,7 +52,7 @@ class ClauseBankPL(BaseClauseBank):
         self.transformed_example = np.empty(self.dim[0] * math.ceil(self.dim[1] / 32.0), dtype=np.uint32, order="c")
         
         self.bits_per_weight = 9  # FIXME: Hardcoded for now, but could be parameterized
-        packed_weight_size = math.ceil(self.number_of_classes * self.number_of_clauses / math.floor(32 / self.bits_per_weight))
+        packed_weight_size = math.ceil(self.number_of_classes / math.floor(32 / self.bits_per_weight)) * self.number_of_clauses
         self.packed_weights_buffer = np.empty(packed_weight_size, dtype=np.uint32, order="c")
 
         self.type_ia_feedback_counter = np.zeros(self.number_of_clauses, dtype=np.uint32, order="c")
