@@ -529,7 +529,7 @@ void cbpl_pack_weights(
 	for (int row = 0; row < num_rows; row++) {
 		for (int col = 0; col < num_cols; col++) {
 			// Reset chunk when starting a new one
-			if (weight_count % num_weights_per_chunk == 0) {
+			if ((weight_count % num_weights_per_chunk == 0) || ((weight_count % num_cols) == 0)) {
 				chunk = 0;
 			}
 			
@@ -544,7 +544,7 @@ void cbpl_pack_weights(
 			chunk |= masked_weight << bit_position;
 			
 			// Check if chunk is full or if the clause is fully written
-			if ((weight_count % num_weights_per_chunk == num_weights_per_chunk - 1) || (col == (num_cols - 1))) {
+			if ((weight_count % num_weights_per_chunk == num_weights_per_chunk - 1) || ((weight_count % num_cols) == (num_cols - 1))) {
 				packed_weights[packed_idx++] = chunk;
 			}
 			
