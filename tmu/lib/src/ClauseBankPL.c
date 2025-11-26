@@ -513,12 +513,9 @@ void cbpl_pack_weights(
 	int num_cols,
 	int bits_per_weight
 )
-{
-	// Pack weights with transpose: input is [num_rows, num_cols], transpose to [num_cols, num_rows]
-	// Then pack and reverse
-	// This avoids creating a transposed copy in Python
-	
+{	
 	int num_weights_per_chunk = 32 / bits_per_weight;
+	int chunks_per_clause = (num_cols + num_weights_per_chunk - 1) / num_weights_per_chunk;
 	unsigned int weight_mask = (1 << bits_per_weight) - 1;
 	
 	unsigned int chunk = 0;
@@ -527,37 +524,18 @@ void cbpl_pack_weights(
 	int total_weights = num_rows * num_cols;
 	
 	for (int row = 0; row < num_rows; row++) {
-		for (int col = 0; col < num_cols; col++) {
-			// Reset chunk when starting a new one
-			if ((weight_count % num_weights_per_chunk == 0) || ((weight_count % num_cols) == 0)) {
-				chunk = 0;
+		for (int g = 0; g < chunks_per_clause; g++) {
+			chunk = 0;
+			int base = g * num_weights_per_chunk;
+			for (int i = 0; i < num_weights_per_chunk; i++) {
+				int pos = base + i;
+				if (pos < num_cols) {
+					int weight_value = weights[row * num_cols + pos];
+					chunk |= ((unsigned int)weight_value & weight_mask) << (i * bits_per_weight);
+				}
 			}
-			
-			// Access weight at [row, col] in original array (row-major order)
-			int weight_value = weights[row * num_cols + col];
-			unsigned int masked_weight = weight_value & weight_mask;
-			
-			// Calculate bit position within the chunk
-			int bit_position = (weight_count % num_weights_per_chunk) * bits_per_weight;
-			
-			// OR the masked weight into the chunk
-			chunk |= masked_weight << bit_position;
-			
-			// Check if chunk is full or if the clause is fully written
-			if ((weight_count % num_weights_per_chunk == num_weights_per_chunk - 1) || ((weight_count % num_cols) == (num_cols - 1))) {
-				packed_weights[packed_idx++] = chunk;
-			}
-			
-			weight_count++;
+			packed_weights[row * chunks_per_clause + (chunks_per_clause - 1 - g)] = chunk;
 		}
-	}
-	
-	// Reverse the array in-place
-	int total_chunks = packed_idx;
-	for (int i = 0; i < total_chunks / 2; i++) {
-		unsigned int temp = packed_weights[i];
-		packed_weights[i] = packed_weights[total_chunks - 1 - i];
-		packed_weights[total_chunks - 1 - i] = temp;
 	}
 }
 
