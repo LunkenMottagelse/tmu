@@ -388,59 +388,57 @@ void cbpl_get_literals(
 }
 
 void cbpl_get_model(
-	const unsigned int *ta_state,
-	unsigned int number_of_clauses,
-	unsigned int number_of_literals,
-	unsigned int number_of_state_bits,
-	unsigned int *model
+    const unsigned int *ta_state,
+    unsigned int number_of_clauses,
+    unsigned int number_of_literals,
+    unsigned int number_of_state_bits,
+    unsigned int *model
 )
 {
-	unsigned int number_of_ta_chunks = (number_of_literals-1)/32 + 1;
-	
-	// Calculate number of 32-bit chunks needed per clause (after padding)
-	unsigned int padded_literals = number_of_literals;
-	if (number_of_literals % 32 != 0) {
-		padded_literals = ((number_of_literals / 32) + 1) * 32;
-	}
-	unsigned int chunks_per_clause = padded_literals / 32;
-	unsigned int padding = padded_literals - number_of_literals;
+    // Calculate chunk dimensions
+    unsigned int chunks_per_clause = (number_of_literals + 31) / 32;
+    unsigned int padding = (chunks_per_clause * 32) - number_of_literals;
+    
+    // Calculate the mask for the first chunk (handles padding)
+    // If padding is 0, mask is all 1s. If padding is > 0, we mask out the upper bits.
+    unsigned int first_chunk_mask = 0xFFFFFFFF;
+    if (padding > 0) {
+        first_chunk_mask = (1U << (32 - padding)) - 1;
+    }
 
-	// Pack each clause's literals into 32-bit integers directly from ta_state
-	unsigned int model_idx = 0;
-	for (unsigned int j = 0; j < number_of_clauses; j++) {
-		unsigned int clause_base = j * number_of_ta_chunks * number_of_state_bits;		
-		for (unsigned int chunk = 0; chunk < chunks_per_clause; chunk++) {
-			unsigned int packed_value = 0;
-			
-			// For each of the 32 bits in this chunk
-			for (int i = 0; i < 32; i++) {
-				// Position in the padded array
-				int padded_pos = chunk * 32 + i;
-				
-				// Check if this is padding or actual data
-				if (padded_pos < padding) {
-					// This is padding, bit = 0 (already initialized)
-					continue;
-				}
-				
-				int reversed_pos = padded_pos - padding;
-				
-				int original_pos = number_of_literals - 1 - reversed_pos;
-				
-				unsigned int ta_chunk = original_pos / 32;
-				unsigned int chunk_pos = original_pos % 32;
-				
-				// Read directly from ta_state
-				unsigned int ta_pos = clause_base + ta_chunk * number_of_state_bits + number_of_state_bits - 1;
+    // Pointer to the start of the output array
+    unsigned int *current_model_ptr = model;
 
-				if (ta_state[ta_pos] & (1 << chunk_pos)) {
-					packed_value |= (1 << (31 - i));
-				}
-			}
-			
-			model[model_idx++] = packed_value;
-		}
-	}
+    // Pre-calculate the stride (jump size) between clauses in ta_state
+    unsigned int clause_stride = chunks_per_clause * number_of_state_bits;
+
+    // Loop through clauses
+    for (unsigned int j = 0; j < number_of_clauses; j++) {
+        
+        // Base address for this clause in ta_state
+        // We add (number_of_state_bits - 1) because we only care about the last word of the state
+        const unsigned int *clause_ta_base = ta_state + (j * clause_stride) + (number_of_state_bits - 1);
+
+        // Loop through chunks
+        for (unsigned int c = 0; c < chunks_per_clause; c++) {
+            
+            // LOGIC: The original code effectively reads chunks in reverse order.
+            // Target Chunk 0 comes from Source Chunk (N-1)
+            // Target Chunk 1 comes from Source Chunk (N-2)
+            unsigned int source_chunk_idx = chunks_per_clause - 1 - c;
+
+            // Retrieve the word directly
+            unsigned int val = clause_ta_base[source_chunk_idx * number_of_state_bits];
+
+            // Apply padding mask only to the first chunk of the clause
+            if (c == 0) {
+                val &= first_chunk_mask;
+            }
+
+            // Store directly
+            *current_model_ptr++ = val;
+        }
+    }
 }
 
 void cbpl_transform_example(
