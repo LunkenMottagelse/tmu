@@ -233,11 +233,8 @@ class ClauseBankPL(BaseClauseBank):
         self.image_buffer[:] = img
 
         self.ie_ol.sendchannel.transfer(self.ie_buffer)
-        self.ie_ol.sendchannel.wait()
         self.weight_ol.sendchannel.transfer(self.weight_buffer)
-        self.weight_ol.sendchannel.wait()
         self.img_decision_ol.sendchannel.transfer(self.image_buffer)
-        self.img_decision_ol.sendchannel.wait()
         self.img_decision_ol.recvchannel.transfer(self.decision_buffer)
 
         # 2: capture output
