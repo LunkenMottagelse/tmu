@@ -1,6 +1,5 @@
 import logging
 import argparse
-from examples.autoencoder.DimensionalityReductionDemo import default_args
 from tmu.data import MNIST
 from tmu.models.classification.coalesced_classifier import TMCoalescedClassifier
 from tmu.tools import BenchmarkTimer
@@ -111,7 +110,7 @@ if __name__ == "__main__":
                 T=clause_count // 4,
                 s=10.0,
                 weighted_clauses=True,
-                platform='FPGA',
+                platform='CPU',
                 focused_negative_sampling=True,
                 epochs=10,
                 dim=patch_dim,

@@ -450,7 +450,7 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
             negative_weights=True
         )
 
-    @profile(output_file='fpga_fit.prof')
+    # @profile(output_file='fpga_fit.prof')
     def _fit_fpga(self, X, Y, shuffle=True, **kwargs):
         self.init(X, Y)
 
@@ -547,7 +547,7 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
                     self.update(Ym[batch_example], batch_example, encoded_X_train, X)
         return
 
-    @profile(output_file='cpu_fit.prof')
+    # @profile(output_file='cpu_fit.prof')
     def fit(self, X, Y, shuffle=True, **kwargs):
         self.init(X, Y)
 
