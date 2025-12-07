@@ -1,9 +1,5 @@
 import logging
 import argparse
-from tmu.data import MNIST
-from tmu.models.classification.coalesced_classifier import TMCoalescedClassifier
-from tmu.tools import BenchmarkTimer
-
 
 logging.basicConfig(filename='run_all_bitfiles.log',
                     filemode='a',
@@ -11,6 +7,10 @@ logging.basicConfig(filename='run_all_bitfiles.log',
                     datefmt='%H:%M:%S',
                     level=logging.INFO)
 _LOGGER = logging.getLogger(__name__)
+
+from tmu.data import MNIST
+from tmu.models.classification.coalesced_classifier import TMCoalescedClassifier
+from tmu.tools import BenchmarkTimer
 
 def metrics(args):
     return dict(
