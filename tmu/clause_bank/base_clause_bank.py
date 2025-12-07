@@ -23,7 +23,7 @@ class BaseClauseBank(CFFISerializable):
             patch_dim: typing.Union[tuple, None],
             **kwargs
     ):
-        self._warn_unknown_arguments(**kwargs)
+        # self._warn_unknown_arguments(**kwargs)
         assert isinstance(number_of_clauses, int)
         assert isinstance(patch_dim, tuple) or patch_dim is None
 

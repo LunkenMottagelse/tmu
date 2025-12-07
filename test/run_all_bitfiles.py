@@ -50,7 +50,7 @@ def main(args):
         bitfile_path=args.bitfile_path
     )
 
-    _LOGGER.info(f"Running {TMCoalescedClassifier} for {args.epochs}")
+    _LOGGER.info(f"Running {TMCoalescedClassifier} for {args.epochs} epochs with bitfile {args.bitfile_path}")
     for epoch in range(args.epochs):
 
         benchmark1 = BenchmarkTimer()
