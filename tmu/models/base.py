@@ -98,7 +98,8 @@ class TMBaseModel:
             absorbing_include=None,
             absorbing_exclude=None,
             squared_weight_update_p=False,
-            seed=None
+            seed=None,
+            bitfile_path=None
     ):
         self.seed = seed
         self.rng = np.random.RandomState(seed)
@@ -144,6 +145,7 @@ class TMBaseModel:
         self.feedback_rate_excluded_literals = feedback_rate_excluded_literals
         self.literal_insertion_state = literal_insertion_state
         self.squared_weight_update_p = squared_weight_update_p
+        self.bitfile_path = bitfile_path
         
         self.X_train = np.zeros(0, dtype=np.uint32)
         self.X_test = np.zeros(0, dtype=np.uint32)
@@ -339,6 +341,7 @@ class TMBaseModel:
             seed=self.seed,
             number_of_classes=number_of_classes,
             get_weights_callback=get_weights_callback
+            bitfile_path=self.bitfile_path,
         )
         return clause_bank_type, clause_bank_args
 

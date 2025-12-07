@@ -40,6 +40,7 @@ class ClauseBankPL(BaseClauseBank):
         self.incremental = incremental
         self.number_of_classes = int(kwargs.get("number_of_classes", 10))
         self.get_weights_callback = kwargs.get("get_weights_callback", None)
+        self.bitfile_path = kwargs.get("bitfile_path", None)
 
         self.clause_output = np.empty(self.number_of_clauses, dtype=np.uint32, order="c")
         self.clause_output_batch = np.empty(self.number_of_clauses * batch_size, dtype=np.uint32, order="c")
@@ -100,7 +101,7 @@ class ClauseBankPL(BaseClauseBank):
         from pynq import Overlay
         from pynq import allocate
 
-        self.ol = Overlay("/home/xilinx/modded_tmu/bitfiles/TM_Inference.bit") # Hardcoded path to bitfiles
+        self.ol = Overlay(self.bitfile_path) # Use bitfile_path from args
         self.img_decision_ol = self.ol.axi_dma_0
         self.ie_ol = self.ol.axi_dma_1
         self.weight_ol = self.ol.axi_dma_2

@@ -87,7 +87,8 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         weighted_clauses=False,
         clause_drop_p=0.0,
         literal_drop_p=0.0,
-        seed=None
+        seed=None,
+        bitfile_path=None
     ):
         super().__init__(
             number_of_clauses=number_of_clauses,
@@ -108,7 +109,8 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
             weighted_clauses=weighted_clauses,
             clause_drop_p=clause_drop_p,
             literal_drop_p=literal_drop_p,
-            seed=seed
+            seed=seed,
+            bitfile_path=bitfile_path
         )
         SingleClauseBankMixin.__init__(self)
         MultiWeightBankMixin.__init__(self, seed=seed)
