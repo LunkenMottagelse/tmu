@@ -4,8 +4,13 @@ from tmu.data import MNIST
 from tmu.models.classification.coalesced_classifier import TMCoalescedClassifier
 from tmu.tools import BenchmarkTimer
 
-_LOGGER = logging.getLogger(__name__)
 
+logging.basicConfig(filename='run_all_bitfiles.log',
+                    filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=logging.INFO)
+_LOGGER = logging.getLogger(__name__)
 
 def metrics(args):
     return dict(
@@ -103,18 +108,19 @@ if __name__ == "__main__":
     # Iterate through different bitfiles
     for patch_dim in [(5, 5), (10, 10), (5, 10), (15, 15)]:
         for clause_count in [64, 128, 256, 512, 1024, 2048]:
-            _LOGGER.info(f"Running bitfile for patch_dim={patch_dim} and clause_count={clause_count}")
-            bitfile_path = f"/home/xilinx/modded_tmu/bitfiles/{patch_dim[0]:02d}x{patch_dim[1]:02d}_{clause_count:04d}_14_1/TM_Inference.bit"
-            args = argparse.Namespace(
-                num_clauses=clause_count,
-                T=clause_count // 4,
-                s=10.0,
-                weighted_clauses=True,
-                platform='CPU',
-                focused_negative_sampling=True,
-                epochs=10,
-                dim=patch_dim,
-                bitfile_path=bitfile_path
-            )
-            results = main(args)
-            _LOGGER.info(results)
+            for w_platform in ['FPGA', 'CPU']:
+                _LOGGER.info(f"Running bitfile for patch_dim={patch_dim} and clause_count={clause_count} on platform={w_platform}")
+                bitfile_path = f"/home/xilinx/modded_tmu/bitfiles/{patch_dim[0]:02d}x{patch_dim[1]:02d}_{clause_count:04d}_14_1/TM_Inference.bit"
+                args = argparse.Namespace(
+                    num_clauses=clause_count,
+                    T=clause_count // 4,
+                    s=10.0,
+                    weighted_clauses=True,
+                    platform=w_platform,
+                    focused_negative_sampling=True,
+                    epochs=10,
+                    dim=patch_dim,
+                    bitfile_path=bitfile_path
+                )
+                results = main(args)
+                _LOGGER.info(results)
