@@ -1,11 +1,14 @@
 import logging
 import argparse
 
-logging.basicConfig(filename='run_all_bitfiles.log',
-                    filemode='a',
-                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                    datefmt='%H:%M:%S',
-                    level=logging.INFO)
+# Set up file handler explicitly since basicConfig is a no-op if root logger already has handlers
+logging.basicConfig(level=logging.INFO)
+file_handler = logging.FileHandler('run_all_bitfiles.log', mode='a')
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+    datefmt='%H:%M:%S'
+))
+logging.root.addHandler(file_handler)
 _LOGGER = logging.getLogger(__name__)
 
 from tmu.data import MNIST
