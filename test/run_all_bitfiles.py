@@ -5,8 +5,9 @@ import argparse
 logging.basicConfig(level=logging.INFO)
 file_handler = logging.FileHandler('run_all_bitfiles.log', mode='a')
 file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-    datefmt='%H:%M:%S'
+    '{asctime:>12},{msecs:03.0f} - {name} - {levelname} --- {message}',
+    datefmt='%d %H:%M:%S',
+    style='{'
 ))
 logging.root.addHandler(file_handler)
 _LOGGER = logging.getLogger(__name__)
